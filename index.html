@@ -529,6 +529,23 @@
                 max-width: 90%; /* Take up more width */
             }
         }
+        /* Spinner styles */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--cor-destaque);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -2526,4 +2543,656 @@
                     const isAlreadyCompleted = this.player.completedQuests.some(q => q.id === questId);
                     const isAlreadyClaimed = this.player.claimedQuests.some(q => q.id === questId);
 
-                
+                    if (quest.status === 'available' && !isAlreadyActive && !isAlreadyCompleted && !isAlreadyClaimed) {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `
+                            <div class="quest-title">${quest.title}</div>
+                            <div class="quest-description">${quest.description}</div>
+                            <div class="quest-rewards">
+                                <strong>Recompensas:</strong>
+                                <ul>
+                                    <li>${quest.rewards.xp || 0} XP</li>
+                                    <li>${quest.rewards.gold || 0} Ouro</li>
+                                    ${Object.keys(quest.rewards.items || {}).map(item => `<li>${quest.rewards.items[item]}x ${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <button class="btn btn-sm btn-primary btn-quest-action btn-accept-quest" data-quest-id="${quest.id}">Aceitar Missão</button>
+                        `;
+                        this.elements.availableQuestsList.appendChild(li);
+                    }
+                }
+                if (this.elements.availableQuestsList.children.length === 0) {
+                    this.elements.availableQuestsList.innerHTML = '<li class="list-group-item">Nenhuma missão disponível no momento.</li>';
+                }
+
+                // Populate Active Quests
+                if (this.player.activeQuests.length === 0) {
+                    this.elements.activeQuestsList.innerHTML = '<li class="list-group-item">Nenhuma missão ativa.</li>';
+                } else {
+                    this.player.activeQuests.forEach(activeQuest => {
+                        const quest = this.quests[activeQuest.id]; 
+                        if (!quest) return; 
+
+                        let objectivesHtml = '<strong>Objetivos:</strong><ul>';
+                        let totalProgress = 0;
+                        let totalRequired = 0;
+
+                        quest.objectives.forEach(objDef => { 
+                            const current = activeQuest.objectives.find(o => o.type === objDef.type && o.target === objDef.target)?.current || 0;
+                            objectivesHtml += `<li>${objDef.type === 'defeat' ? 'Derrotar' : 'Coletar'} ${objDef.target}: ${current}/${objDef.required}</li>`;
+                            totalProgress += current;
+                            totalRequired += objDef.required;
+                        });
+                        objectivesHtml += '</ul>';
+
+                        const progressPercent = totalRequired > 0 ? (totalProgress / totalRequired) * 100 : 0;
+
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `
+                            <div class="quest-title">${quest.title}</div>
+                            <div class="quest-description">${quest.description}</div>
+                            <div class="quest-objectives">${objectivesHtml}</div>
+                            <div class="progress quest-progress-bar">
+                                <div class="progress-bar" role="progressbar" style="width: ${progressPercent}%;" aria-valuenow="${progressPercent}" aria-valuemin="0" aria-valuemax="100">${Math.round(progressPercent)}%</div>
+                            </div>
+                        `;
+                        this.elements.activeQuestsList.appendChild(li);
+                    });
+                }
+
+                // Populate Completed Quests
+                if (this.player.completedQuests.length === 0) {
+                    this.elements.completedQuestsList.innerHTML = '<li class="list-group-item">Nenhuma missão concluída para entregar.</li>';
+                } else {
+                    this.player.completedQuests.forEach(completedQuest => {
+                        const quest = this.quests[completedQuest.id];
+                        if (!quest) return;
+
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `
+                            <div class="quest-title">${quest.title} (Concluída!)</div>
+                            <div class="quest-description">${quest.description}</div>
+                            <div class="quest-rewards">
+                                <strong>Recompensas:</strong>
+                                <ul>
+                                    <li>${quest.rewards.xp || 0} XP</li>
+                                    <li>${quest.rewards.gold || 0} Ouro</li>
+                                    ${Object.keys(quest.rewards.items || {}).map(item => `<li>${quest.rewards.items[item]}x ${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <button class="btn btn-sm btn-success btn-quest-action btn-claim-reward" data-quest-id="${quest.id}">Entregar Recompensa</button>
+                        `;
+                        this.elements.completedQuestsList.appendChild(li);
+                    });
+                }
+            },
+
+            acceptQuest(questId) {
+                const quest = this.quests[questId];
+                if (!quest || quest.status !== 'available') {
+                    this.addToLog('Esta missão não está disponível para ser aceita.');
+                    return;
+                }
+
+                const newActiveQuest = JSON.parse(JSON.stringify(quest));
+                newActiveQuest.status = 'active';
+                this.player.activeQuests.push(newActiveQuest);
+                this.quests[questId].status = 'active'; 
+
+                this.addToLog(`Você aceitou a missão: "${quest.title}"`);
+                this.updateQuestsModal();
+            },
+
+            updateQuestProgress(objectiveType, targetId, quantity = 1) {
+                let questUpdated = false;
+                this.player.activeQuests.forEach(activeQuest => {
+                    const questDefinition = this.quests[activeQuest.id];
+                    if (!questDefinition) return;
+
+                    questDefinition.objectives.forEach(objDef => {
+                        if (objDef.type === objectiveType && objDef.target === targetId) {
+                            const activeObj = activeQuest.objectives.find(o => o.type === objectiveType && o.target === objDef.target);
+                            if (activeObj && activeObj.current < objDef.required) {
+                                activeObj.current = Math.min(objDef.required, activeObj.current + quantity);
+                                this.addToLog(`Progresso da missão "${questDefinition.title}": ${objDef.target} (${activeObj.current}/${objDef.required})`);
+                                questUpdated = true;
+                            }
+                        }
+                    });
+
+                    this.checkQuestCompletion(activeQuest.id);
+                });
+                if (questUpdated) {
+                    this.updateQuestsModal(); 
+                }
+            },
+
+            checkQuestCompletion(questId) {
+                const activeQuestIndex = this.player.activeQuests.findIndex(q => q.id === questId);
+                if (activeQuestIndex === -1) return;
+
+                const activeQuest = this.player.activeQuests[activeQuestIndex];
+                const questDefinition = this.quests[activeQuest.id];
+
+                const allObjectivesMet = questDefinition.objectives.every(objDef => { 
+                    const currentProgress = activeQuest.objectives.find(o => o.type === objDef.type && o.target === objDef.target)?.current || 0;
+                    return currentProgress >= objDef.required;
+                });
+
+                if (allObjectivesMet) {
+                    this.player.activeQuests.splice(activeQuestIndex, 1);
+                    this.player.completedQuests.push(activeQuest);
+                    this.quests[activeQuest.id].status = 'completed'; 
+                    this.addToLog(`Missão "${questDefinition.title}" concluída! Volte ao Ancião para entregar.`);
+                    this.updateQuestsModal();
+                }
+            },
+
+            claimQuestReward(questId) {
+                const completedQuestIndex = this.player.completedQuests.findIndex(q => q.id === questId);
+                if (completedQuestIndex === -1) {
+                    this.addToLog('Esta missão não está concluída ou já foi entregue.');
+                    return;
+                }
+
+                const quest = this.quests[questId]; 
+                if (!quest) return;
+
+                if (quest.rewards.xp) {
+                    this.changeStat('xp', quest.rewards.xp);
+                    this.addToLog(`Você ganhou ${quest.rewards.xp} XP.`);
+                }
+                if (quest.rewards.gold) {
+                    this.changeStat('gold', quest.rewards.gold);
+                    this.addToLog(`Você ganhou ${quest.rewards.gold} Ouro.`);
+                }
+                if (quest.rewards.items) {
+                    for (const item in quest.rewards.items) {
+                        this.addToInventory(item, quest.rewards.items[item]);
+                    }
+                }
+
+                const claimedQuest = this.player.completedQuests.splice(completedQuestIndex, 1)[0];
+                this.player.claimedQuests.push(claimedQuest);
+                this.quests[questId].status = 'claimed'; 
+
+                this.addToLog(`Recompensas da missão "${quest.title}" entregues!`);
+                this.updateQuestsModal();
+            },
+
+            // Skill Functions
+            updateSkillsModal() {
+                this.elements.learnedSkillsList.innerHTML = '';
+                this.elements.availableSkillsList.innerHTML = '';
+                this.updateStatus(); 
+
+                // Populate Learned Skills tab
+                if (this.player.learnedSkills.length === 0) {
+                    this.elements.learnedSkillsList.innerHTML = '<li class="list-group-item">Nenhuma habilidade aprendida.</li>';
+                } else {
+                    this.player.learnedSkills.forEach(skillId => {
+                        const skill = this.skills[skillId];
+                        if (!skill) return;
+
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `
+                            <div class="skill-title">${skill.name} (${skill.type === 'passive' ? 'Passiva' : skill.type === 'active_combat' ? 'Combate' : 'Fora de Combate'})</div>
+                            <div class="skill-description">${skill.description}</div>
+                            ${skill.type === 'active_out_of_combat' ? 
+                                `<button class="btn btn-sm btn-info btn-skill-action btn-use-skill" data-skill-id="${skill.id}">Usar (${skill.cost.mp || 0} PM)</button>` : ''}
+                        `;
+                        this.elements.learnedSkillsList.appendChild(li);
+                    });
+                }
+
+                // Populate Available Skills tab
+                let hasAvailableSkills = false;
+                for (const skillId in this.skills) {
+                    const skill = this.skills[skillId];
+                    const isLearned = this.player.learnedSkills.includes(skill.id);
+                    
+                    if (!isLearned) {
+                        let canLearn = true;
+                        let requirementsText = [];
+
+                        // Check level requirement
+                        if (skill.requirements.level && this.player.level < skill.requirements.level) {
+                            canLearn = false;
+                            requirementsText.push(`Nível ${skill.requirements.level}`);
+                        }
+                        // Check attribute requirements
+                        if (skill.requirements.strength && this.player.strength < skill.requirements.strength) {
+                            canLearn = false;
+                            requirementsText.push(`Força ${skill.requirements.strength}`);
+                        }
+                        if (skill.requirements.dexterity && this.player.dexterity < skill.requirements.dexterity) {
+                            canLearn = false;
+                            requirementsText.push(`Destreza ${skill.requirements.dexterity}`);
+                        }
+                        if (skill.requirements.intelligence && this.player.intelligence < skill.requirements.intelligence) {
+                            canLearn = false;
+                            requirementsText.push(`Inteligência ${skill.requirements.intelligence}`);
+                        }
+                        if (skill.requirements.constitution && this.player.constitution < skill.requirements.constitution) {
+                            canLearn = false;
+                            requirementsText.push(`Constituição ${skill.requirements.constitution}`);
+                        }
+
+                        // Check skill point cost (only if skillPoints cost is defined and not 0)
+                        if (skill.cost.skillPoints && skill.cost.skillPoints > 0) {
+                            if (this.player.skillPoints < skill.cost.skillPoints) {
+                                canLearn = false;
+                                requirementsText.push(`${skill.cost.skillPoints} Pontos de Atributo`);
+                            }
+                        }
+
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `
+                            <div class="skill-title">${skill.name} (${skill.type === 'passive' ? 'Passiva' : skill.type === 'active_combat' ? 'Combate' : 'Fora de Combate'})</div>
+                            <div class="skill-description">${skill.description}</div>
+                            <div class="skill-details">
+                                Custo: ${skill.cost.skillPoints && skill.cost.skillPoints > 0 ? `${skill.cost.skillPoints} P. Atributo` : ''} ${skill.cost.mp ? `, ${skill.cost.mp} PM` : ''}
+                                ${requirementsText.length > 0 ? `<br>Requisitos: ${requirementsText.join(', ')}` : ''}
+                            </div>
+                            <button class="btn btn-sm ${canLearn ? 'btn-success' : 'btn-secondary disabled'} btn-skill-action btn-learn-skill" data-skill-id="${skill.id}" ${canLearn ? '' : 'disabled'}>
+                                ${canLearn ? 'Aprender' : 'Requisitos Não Atendidos'}
+                            </button>
+                        `;
+                        this.elements.availableSkillsList.appendChild(li);
+                        hasAvailableSkills = true;
+                    }
+                }
+                if (!hasAvailableSkills && this.player.learnedSkills.length === Object.keys(this.skills).length) {
+                    this.elements.availableSkillsList.innerHTML = '<li class="list-group-item">Todas as habilidades foram aprendidas!</li>';
+                } else if (!hasAvailableSkills) {
+                     this.elements.availableSkillsList.innerHTML = '<li class="list-group-item">Nenhuma habilidade disponível para aprender no momento.</li>';
+                }
+            },
+
+            learnSkill(skillId, fromBook = false) { 
+                const skill = this.skills[skillId];
+                if (!skill) {
+                    this.addToLog(`Habilidade '${skillId}' não encontrada.`);
+                    return;
+                }
+                if (this.player.learnedSkills.includes(skillId)) {
+                    this.addToLog(`Você já aprendeu '${skill.name}'.`);
+                    return;
+                }
+
+                if (!fromBook) {
+                    if (skill.requirements.level && this.player.level < skill.requirements.level) {
+                        this.addToLog(`Você precisa ser Nível ${skill.requirements.level} para aprender ${skill.name}.`);
+                        return;
+                    }
+                    if (skill.requirements.strength && this.player.strength < skill.requirements.strength) {
+                        this.addToLog(`Você precisa de Força ${skill.requirements.strength} para aprender ${skill.name}.`);
+                        return;
+                    }
+                    if (skill.requirements.dexterity && this.player.dexterity < skill.requirements.dexterity) {
+                        this.addToLog(`Você precisa de Destreza ${skill.requirements.dexterity} para aprender ${skill.name}.`);
+                        return;
+                    }
+                    if (skill.requirements.intelligence && this.player.intelligence < skill.requirements.intelligence) {
+                        this.addToLog(`Você precisa de Inteligência ${skill.requirements.intelligence} para aprender ${skill.name}.`);
+                        return;
+                    }
+                    if (skill.requirements.constitution && this.player.constitution < skill.requirements.constitution) {
+                        this.addToLog(`Você precisa de Constituição ${skill.requirements.constitution} para aprender ${skill.name}.`);
+                        return;
+                    }
+
+                    if (skill.cost.skillPoints && skill.cost.skillPoints > 0) {
+                        if (this.player.skillPoints < skill.cost.skillPoints) {
+                            this.addToLog(`Você não tem Pontos de Atributo suficientes para aprender ${skill.name}.`);
+                            return;
+                        }
+                        this.player.skillPoints -= skill.cost.skillPoints;
+                    }
+                }
+
+                this.player.learnedSkills.push(skillId);
+                this.addToLog(`Você aprendeu a habilidade: "${skill.name}"!`);
+                this.calculateDerivedStats(); 
+                this.updateSkillsModal();
+                this.updateCharacterModal(); 
+            },
+
+            useSkillOutOfCombat(skillId) {
+                const skill = this.skills[skillId];
+                if (!skill || skill.type !== 'active_out_of_combat') {
+                    this.addToLog(`Habilidade '${skillId}' não pode ser usada fora de combate.`);
+                    return;
+                }
+                if (!this.player.learnedSkills.includes(skillId)) {
+                    this.addToLog(`Você ainda não aprendeu '${skill.name}'.`);
+                    return;
+                }
+
+                if (skill.cost.mp) {
+                    if (this.player.mp < skill.cost.mp) {
+                        this.addToLog(`Você não tem PM suficiente para usar ${skill.name}.`);
+                        return;
+                    }
+                    this.changeStat('mp', -skill.cost.mp);
+                }
+
+                if (skill.effect.mpRestore) {
+                    this.changeStat('mp', skill.effect.mpRestore);
+                    this.addToLog(`Você usou ${skill.name} e restaurou ${skill.effect.mpRestore} PM.`);
+                }
+
+                this.updateSkillsModal();
+                this.updateStatus();
+            },
+
+            // Save/Load System Functions
+            saveGame() {
+                try {
+                    const saveData = {
+                        player: this.player,
+                        quests: this.quests, 
+                        currentEnemy: this.currentEnemy, 
+                        state: this.state, 
+                        // Only save dynamically generated scenes (those starting with 'ai_scene_')
+                        dynamicScenes: Object.keys(this.scenes)
+                                            .filter(key => key.startsWith('ai_scene_'))
+                                            .reduce((obj, key) => {
+                                                obj[key] = this.scenes[key];
+                                                return obj;
+                                            }, {})
+                    };
+                    localStorage.setItem(this.SAVE_KEY, JSON.stringify(saveData));
+                    this.addToLog('Jogo guardado com sucesso!');
+                } catch (e) {
+                    console.error('Erro ao guardar o jogo:', e);
+                    this.addToLog('Erro ao guardar o jogo. Tente novamente.');
+                }
+            },
+
+            loadGame() {
+                try {
+                    const savedDataString = localStorage.getItem(this.SAVE_KEY);
+                    if (!savedDataString) {
+                        this.addToLog('Nenhum jogo guardado encontrado.');
+                        return false;
+                    }
+
+                    const savedData = JSON.parse(savedDataString);
+
+                    // Restore player state
+                    this.player = savedData.player;
+
+                    // Restore quests state (deep copy to avoid reference issues)
+                    this.quests = JSON.parse(JSON.stringify(savedData.quests));
+
+                    // Restore combat state if applicable
+                    this.currentEnemy = savedData.currentEnemy;
+                    this.state = savedData.state;
+
+                    // Restore dynamic scenes and merge them with static scenes
+                    // Ensure static scenes are not overwritten if they share keys
+                    this.scenes = { ...this.initScenesStatic(), ...(savedData.dynamicScenes || {}) };
+
+                    // Update UI based on loaded data
+                    this.loadScene(this.player.location); // Re-load the last scene
+                    if (this.state === 'combat' && this.currentEnemy) {
+                        this.elements.combatArea.classList.add('active');
+                        this.updateCombatUI();
+                    } else {
+                        this.elements.combatArea.classList.remove('active');
+                    }
+                    this.calculateDerivedStats(); // Recalculate stats based on loaded attributes/equipment/skills
+                    this.updateStatus();
+                    this.updateInventoryModal();
+                    this.updateEquipmentModal();
+                    this.updateCharacterModal();
+                    this.updateMagicModal();
+                    this.updateSkillsModal();
+                    this.updateQuestsModal();
+
+                    this.addToLog('Jogo carregado com sucesso!');
+                    return true;
+                } catch (e) {
+                    console.error('Erro ao carregar o jogo:', e);
+                    this.addToLog('Erro ao carregar o jogo. O ficheiro guardado pode estar corrompido.');
+                    return false;
+                }
+            },
+
+            resetGame() {
+                localStorage.removeItem(this.SAVE_KEY); // Clear saved data
+                this.initPlayerState();
+                this.initQuests(); 
+                this.initSkills(); 
+                this.elements.eventLogList.innerHTML = ''; 
+                this.scenes = this.initScenesStatic(); // Re-initialize scenes to remove dynamic ones
+                this.loadScene('floresta_antiga');
+                this.addToLog('A aventura foi reiniciada e o jogo guardado foi apagado.');
+                this.calculateDerivedStats(); 
+            },
+
+            // New function to fetch information from Gemini for general context
+            async fetchGeminiInformation(contextPrompt = "um segredo mágico ou um pedaço de história esquecida que se poderia encontrar num local de fantasia medieval") {
+                this.elements.narrativeArea.innerHTML = `<div class="spinner"></div> Aguarde... O mundo está a sussurrar os seus segredos sobre ${contextPrompt}...`;
+                this.elements.actionButtons.innerHTML = ''; // Clear action buttons during fetch
+
+                const prompt = `Gerar um breve trecho de texto sobre ${contextPrompt}. O texto deve ser misterioso e convidativo, com cerca de 100-150 palavras.`;
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = "AIzaSyByB7fAATLm-TZOZRf82freeSApGUN-tA0"; // Use the provided API key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Erro da API Gemini (HTTP):', response.status, errorText);
+                        this.elements.narrativeArea.innerHTML = `O ar estremece... Não foi possível decifrar os segredos. <br><small class="text-danger">Erro da API: ${response.status} - ${errorText.substring(0, 100)}...</small>`;
+                        this.addToLog(`Falha ao conectar com os sussurros antigos do mundo sobre ${contextPrompt}.`);
+                        return;
+                    }
+
+                    const result = await response.json();
+                    console.log('Resposta bruta da API Gemini:', result); // Log the raw response
+
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        this.elements.narrativeArea.innerHTML = `<strong>Você descobriu algo novo:</strong><br><br>${text}`;
+                        this.addToLog(`Você descobriu informações sobre ${contextPrompt}.`);
+                    } else {
+                        this.elements.narrativeArea.innerHTML = `Você não consegue encontrar informações sobre ${contextPrompt}. <br><small class="text-muted">Erro: Resposta inesperada da API. (Verifique o console para detalhes)</small>`;
+                        this.addToLog(`Não foi possível encontrar informações sobre ${contextPrompt}.`);
+                        console.error('Estrutura de resposta inesperada do Gemini API:', result);
+                    }
+                } catch (error) {
+                    // Catch network errors or JSON parsing errors
+                    console.error('Erro ao chamar a API Gemini ou ao analisar JSON:', error);
+                    this.elements.narrativeArea.innerHTML = `Uma estranha névoa parece obscurecer as informações sobre ${contextPrompt}. Não foi possível decifrar nada. <br><small class="text-danger">Erro de conexão/parsing: Verifique sua internet ou o console.</small>`;
+                    this.addToLog(`Falha ao conectar com os sussurros antigos do mundo sobre ${contextPrompt}.`);
+                } finally {
+                    this.updateActionButtons(); 
+                }
+            },
+
+            // New helper function to manage AI scene loading/generation
+            async handleAISceneNavigation(targetSceneId, previousSceneId, depth) {
+                if (this.scenes[targetSceneId]) {
+                    // Scene already exists in memory, just load it
+                    this.loadScene(targetSceneId);
+                } else {
+                    // Scene does not exist, generate its content
+                    this.elements.narrativeArea.innerHTML = `<div class="spinner"></div> Aguarde... O mundo está a moldar-se diante dos seus olhos...`;
+                    this.elements.actionButtons.innerHTML = ''; // Clear action buttons during fetch
+
+                    const newSceneId = await this.generateAISceneContent(targetSceneId, previousSceneId, depth);
+                    if (newSceneId) {
+                        this.loadScene(newSceneId);
+                    } else {
+                        this.addToLog('Falha ao gerar novo local. Retornando.');
+                        this.loadScene(previousSceneId); // Fallback
+                    }
+                }
+            },
+
+            // New function to generate AI-driven scenes content and add to game.scenes
+            async generateAISceneContent(sceneIdToCreate, previousSceneId, depth) {
+                const maxDepth = 2; // Limit the chain of AI-generated scenes for demonstration purposes
+                const predefinedScenes = ['vila_tranquila', 'caverna_escura', 'torre_abandonada'];
+
+                const prompt = `Gerar uma breve descrição para um novo local de RPG de texto de fantasia medieval. O local deve ser interessante. Fornecer 2 a 4 opções de caminhos/saídas. Para cada caminho, inclua um 'nome' curto (ex: "Trilha para o Norte"), uma 'descrição_breve' (ex: "Um caminho estreito que some na névoa.") e uma 'chave' única (ex: "north_path"). Formatar a resposta como JSON com 'description' para a descrição do local e 'paths' como um array de objetos, cada um com 'name', 'brief_description' e 'key'. Exemplo: {"description": "Uma clareira silenciosa...", "paths": [{"name": "Trilha para o Norte", "brief_description": "Um caminho estreito que some na névoa.", "key": "north_trail"}, {"name": "Rio Murmurante", "brief_description": "Um rio que serpenteia por rochas lisas.", "key": "whispering_river"}]}. Certifique-se de que as descrições dos caminhos são concisas e que os nomes e chaves dos caminhos são únicos e descritivos. O local anterior era: ${this.scenes[previousSceneId].description.split('.')[0]}.`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = {
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                description: { type: "STRING" },
+                                paths: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            name: { type: "STRING" },
+                                            brief_description: { type: "STRING" },
+                                            key: { type: "STRING" } // Ensure AI provides a key
+                                        },
+                                        required: ["name", "brief_description", "key"]
+                                    }
+                                }
+                            },
+                            required: ["description", "paths"]
+                        }
+                    }
+                };
+                const apiKey = "AIzaSyByB7fAATLm-TZOZRf82freeSApGUN-tA0"; // Use the provided API key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Erro da API Gemini (HTTP) ao gerar cena:', response.status, errorText);
+                        this.elements.narrativeArea.innerHTML = `O portal estremece... Não foi possível moldar o novo local. <br><small class="text-danger">Erro da API: ${response.status} - ${errorText.substring(0, 100)}...</small>`;
+                        this.addToLog('Falha ao gerar novo local.');
+                        return null;
+                    }
+
+                    const result = await response.json();
+                    console.log('Resposta bruta da API Gemini (geração de cena):', result); // Log the raw response
+
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const jsonText = result.candidates[0].content.parts[0].text;
+                        const generatedData = JSON.parse(jsonText); // This might throw an error if JSON is malformed
+
+                        const aiSceneOptions = {};
+
+                        // Always add a "back" action to the previous scene under "Ir"
+                        aiSceneOptions[`Voltar para ${this.scenes[previousSceneId].description.split('.')[0]}`] = {
+                            type: 'action',
+                            onSelect: () => this.loadScene(previousSceneId)
+                        };
+
+                        const pathsToProcess = [...generatedData.paths]; 
+                        const availablePredefinedScenes = [...predefinedScenes]; 
+
+                        // Randomly assign one path to a predefined scene if conditions met
+                        if (depth < maxDepth && availablePredefinedScenes.length > 0 && pathsToProcess.length > 0) {
+                            const pathIndexToModify = Math.floor(Math.random() * pathsToProcess.length);
+                            const selectedPath = pathsToProcess[pathIndexToModify];
+                            const predefinedSceneToLink = availablePredefinedScenes[Math.floor(Math.random() * availablePredefinedScenes.length)];
+                            
+                            aiSceneOptions[`${selectedPath.name} (${selectedPath.brief_description} - Para ${predefinedSceneToLink.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})`] = {
+                                type: 'action',
+                                onSelect: () => this.loadScene(predefinedSceneToLink)
+                            };
+                            pathsToProcess.splice(pathIndexToModify, 1); // Remove this path from further processing
+                        }
+
+                        // Assign remaining paths to new AI-generated scenes
+                        pathsToProcess.forEach(path => {
+                            const nextSceneIdForPath = `${sceneIdToCreate}_${path.key}`; // Deterministic ID for the next scene in the chain
+
+                            aiSceneOptions[`${path.name} (${path.brief_description})`] = {
+                                type: 'action',
+                                onSelect: () => {
+                                    this.handleAISceneNavigation(nextSceneIdForPath, sceneIdToCreate, depth + 1);
+                                }
+                            };
+                        });
+
+                        // Ensure there's always at least one dynamic path if not at max depth and no predefined link was added
+                        // This ensures the player can always explore further or find a known path
+                        if (Object.keys(aiSceneOptions).length <= 1 && depth < maxDepth) { // Only "back" action or no other actions
+                            aiSceneOptions['Explorar Mais (Novo Local)'] = {
+                                type: 'action',
+                                onSelect: () => this.handleAISceneNavigation(`${sceneIdToCreate}_explore_more_${Date.now()}`, sceneIdToCreate, depth + 1)
+                            };
+                        } else if (Object.keys(aiSceneOptions).length <= 1 && depth >= maxDepth && predefinedScenes.length > 0) {
+                             // If at max depth and still only "back", link to a random predefined scene as a final exit
+                            const randomPredefinedScene = predefinedScenes[Math.floor(Math.random() * predefinedScenes.length)];
+                            aiSceneOptions[`Caminho Conhecido (Para ${randomPredefinedScene.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})`] = {
+                                type: 'action',
+                                onSelect: () => this.loadScene(randomPredefinedScene)
+                            };
+                        }
+
+                        this.scenes[sceneIdToCreate] = {
+                            description: generatedData.description,
+                            actions: {
+                                'Ir': { type: 'submenu', options: aiSceneOptions }
+                            }
+                        };
+
+                        this.elements.narrativeArea.innerHTML = generatedData.description;
+                        this.addToLog(`Você chegou a um novo local: ${generatedData.description.split('.')[0]}.`);
+                        this.updateActionButtons();
+                        return sceneIdToCreate; // Return the ID of the scene that was just generated/updated
+                    } else {
+                        this.elements.narrativeArea.innerHTML = `As páginas estão em branco. Não foi possível decifrar nada. <br><small class="text-muted">Erro: Resposta inesperada da API. (Verifique o console para detalhes)</small>`;
+                        this.addToLog('Não foi possível gerar informações para o novo local.');
+                        console.error('Estrutura de resposta inesperada do Gemini API (geração de cena):', result);
+                        return null;
+                    }
+                } catch (error) {
+                    // Catch network errors or JSON parsing errors
+                    console.error('Erro ao chamar a API Gemini ou ao analisar JSON (geração de cena):', error);
+                    this.elements.narrativeArea.innerHTML = `Uma estranha névoa parece obscurecer as palavras nos livros. Não foi possível decifrar nada. <br><small class="text-danger">Erro de conexão/parsing: Verifique sua internet ou o console.</small>`;
+                    this.addToLog('Falha ao conectar com os sussurros antigos do mundo.');
+                    return null;
+                } finally {
+                    this.updateActionButtons(); 
+                }
+            }
+        };
+
+        Game.init();
+
+    });
+    </script>
+</body>
+</html>
