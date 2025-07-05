@@ -1,0 +1,2529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG de Texto: Fantasia Medieval</title>
+
+    <!-- 
+        Chosen Palette: Earthy Harmony
+        Application Structure Plan: A single-page application with a fixed "dashboard" UI for mobile. Key player stats are always visible at the top. The central area is dedicated to narrative and dynamic action buttons, forming the core gameplay loop. Secondary systems like inventory, character stats, and quests are handled in full-screen modals, accessed via a persistent main menu button at the bottom. This structure maximizes screen real estate for the narrative on mobile devices while keeping all game functions easily accessible through a clear, hierarchical flow. The user starts the game, interacts with scene-specific choices, and uses the main menu for peripheral actions, creating an intuitive and focused experience.
+        Visualization & Content Choices: 
+        - Player Status (HP/MP/XP): Goal: Inform. Method: Dynamic text and styled Bootstrap progress bars in a fixed header. Interaction: None (display only). Justification: Provides constant, at-a- glance feedback on the player's core stats, crucial for decision-making. Library: Bootstrap for progress bars, Vanilla JS for updates.
+        - Narrative Display: Goal: Inform/Immerse. Method: A large, scrollable text block. Interaction: Reading. Justification: This is the core of the text RPG; it needs to be prominent and legible. Library: Vanilla JS to update innerHTML.
+        - Player Choices: Goal: Interact. Method: Dynamically generated, large, touch-friendly buttons using Bootstrap's button and grid classes. Interaction: Clicking/Tapping. Justification: Provides clear, contextual options for the player to drive the story forward. The use of sub-menus handles complex choices without cluttering the UI. Library: Vanilla JS for dynamic creation and event delegation.
+        - Secondary Menus (Inventory, etc.): Goal: Organize/Inform. Method: Full-screen Bootstrap modals. Interaction: Tapping menu buttons to open modals. Justification: Modals prevent the player from leaving the main game context while allowing them to manage their character. This is a standard and effective mobile UX pattern. Library: Bootstrap Modals, Vanilla JS for content population.
+        - Event Log: Goal: Review/Inform. Method: A collapsible Bootstrap element at the bottom of the screen. The header now displays the last event. Interaction: Tapping to expand/collapse, icon indicates state. Justification: Provides persistent feedback on the latest game event without occupying full screen space, while allowing access to history. Library: Bootstrap Collapse, Vanilla JS for adding log entries and updating header.
+        - Character Attributes: Goal: Inform/Customize. Method: Dynamic text display in character modal with interactive buttons for skill point allocation. Interaction: Clicking buttons to increase attributes. Justification: Adds depth to character progression and player agency. Library: Vanilla JS for dynamic updates and event handling.
+        - Equipment System: Goal: Manage/Enhance. Method: Dedicated modal showing equipment slots with equipped items and "Unequip" buttons. Inventory items gain "Equip" buttons. Interaction: Clicking to equip/unequip items, dynamically updating player stats. Justification: Adds a core RPG element for character progression and customization. Library: Vanilla JS for dynamic rendering and stat calculation.
+        - Combat System: Goal: Challenge/Engage. Method: Dedicated combat UI showing enemy stats, player combat actions (Attack, Use Item, Flee), and a combat log. Interaction: Player selects actions, game processes turns. Justification: Core RPG mechanic for player progression and narrative tension. Library: Vanilla JS for all combat logic and UI updates.
+        - Magic System: Goal: Expand combat options. Method: Player can cast spells during combat, consuming MP for various effects (damage, healing). Interaction: Select spell from sub-menu during combat. Justification: Adds strategic depth and alternative combat approaches. Library: Vanilla JS for spell definitions, mana management, and effects.
+        - Out-of-Combat Magic: Goal: Provide utility outside of battle. Method: New "Magic" button in main menu opens a list of spells usable outside combat (e.g., healing). Interaction: Select spell from menu. Justification: Enhances player agency and resource management beyond combat.
+        - Equipment Stat Display: Goal: Inform. Method: Display stat changes (e.g., +5 Attack) next to equipped item names in the equipment modal. Interaction: None (display only). Justification: Provides clear feedback on the impact of equipped items on player stats.
+        - Equip Best Feature: Goal: Convenience/Optimization. Method: A button in the equipment modal to automatically equip the "best" available items from inventory based on defined stat priorities. Interaction: Clicking button. Justification: Streamlines equipment management and helps players optimize their character.
+        - NPC Shop System: Goal: Economic interaction. Method: Introduce an NPC merchant with buying/selling functionality via a dedicated modal. Interaction: Player buys/sells items, managing gold. Justification: Adds depth to resource management and provides avenues for acquiring/disposing of items.
+        - Shop Upgrade Indicator: Goal: Inform. Method: Display a visual indicator (e.g., "Upgrade!") next to purchasable items in the shop if they offer better stats than the currently equipped item in that slot. Interaction: None (display only). Justification: Helps players make informed purchasing decisions.
+        - Quest System: Goal: Provide long-term objectives and narrative progression. Method: Introduce quest-giving NPCs, a quest log modal, and logic to track objectives (defeat enemies, collect items) and award rewards. Interaction: Player accepts quests, completes objectives through gameplay, and claims rewards. Justification: Adds replayability, guides player progression, and enriches the narrative experience.
+        - Skill System: Goal: Provide character progression beyond stats and equipment. Method: Introduce a skill tree/list, allow learning skills via skill points or other means, and implement active/passive skill effects. Interaction: Player chooses skills to learn, uses active skills in or out of combat. Justification: Adds depth to character customization, offers new tactical options, and enhances player agency.
+        - Magic/Skill Books: Goal: Provide alternative means of learning spells/skills through item consumption. Method: Define new item types (magic_book, skill_book) that, when used from inventory, teach the player a specific spell or skill. Interaction: Player uses item from inventory. Justification: Adds another layer to item utility and character progression, encouraging exploration and trade.
+        - Save/Load System: Goal: Persist game state. Method: Use localStorage to store and retrieve player data, including stats, inventory, equipment, spells, skills, and quest progress. Interaction: Player clicks "Save Game" or "Load Game" buttons in the System menu. Justification: Essential for player convenience and long-term engagement, allowing continuation of progress across sessions.
+        - Dynamic Content Generation (Gemini API): Goal: Provide dynamic narrative elements. Method: Integrate a call to the Gemini API to generate text based on in-game context (e.g., exploring a library). Interaction: Player selects an action that triggers the API call, and the generated text updates the narrative. Justification: Enhances replayability and immersion by providing unique, contextually relevant content.
+        CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
+    -->
+
+    <!-- CDNs -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        :root {
+            --fonte-narrativa: 'Merriweather', serif;
+            --fonte-ui: 'Open Sans', sans-serif;
+
+            --cor-fundo: #F5F5DC; /* Beige */
+            --cor-fundo-container: #E8E8D5;
+            --cor-texto-principal: #3B3121; /* Dark Brown */
+            --cor-texto-secundario: #5A4D3C;
+            --cor-destaque: #8B4513; /* SaddleBrown */
+            --cor-hp: #C0392B; /* Pomegranate */
+            --cor-mp: #2980B9; /* Belize Hole */
+            --cor-xp: #F1C40F; /* Sun Flower */
+            --cor-sombra: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: var(--fonte-ui);
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto-principal);
+            overscroll-behavior: contain;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--cor-fundo-container);
+            box-shadow: 0 0 20px var(--cor-sombra);
+        }
+
+        /* Status Bar */
+        #status-bar {
+            padding: 0.75rem 1rem;
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(5px);
+            border-bottom: 1px solid var(--cor-sombra);
+            z-index: 10;
+            position: relative; /* Needed for z-index context for button */
+        }
+
+        .status-info .name {
+            font-weight: 700;
+            font-family: var(--fonte-narrativa);
+            color: var(--cor-destaque);
+        }
+
+        .progress {
+            height: 1rem;
+            background-color: rgba(0,0,0,0.1);
+            font-size: 0.7rem;
+        }
+        .progress-bar {
+            color: white;
+            font-weight: 600;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+        }
+        .progress-bar-hp { background-color: var(--cor-hp); }
+        .progress-bar-mp { background-color: var(--cor-mp); }
+        .progress-bar-xp { background-color: var(--cor-xp); }
+
+        /* Main Content */
+        #main-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            padding-top: 4rem; /* Ajustado para dar espaço ao botão no topo */
+            padding-bottom: 6rem; /* Aumentado para dar espaço ao botão fixo */
+            display: flex;
+            flex-direction: column;
+        }
+
+        #narrative-area {
+            font-family: var(--fonte-narrativa);
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin-bottom: 2rem;
+            flex-shrink: 0;
+        }
+        #narrative-area strong {
+            color: var(--cor-destaque);
+        }
+        #action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .action-btn {
+            font-weight: 600;
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+        }
+        .action-btn:active {
+            transform: scale(0.98);
+        }
+        #submenu-container {
+            padding-left: 20px;
+            border-left: 3px solid var(--cor-destaque);
+            margin: 10px 0;
+        }
+
+        /* Event Log */
+        #event-log-container {
+            background-color: #fff;
+            box-shadow: 0 -5px 10px -5px var(--cor-sombra);
+            z-index: 5;
+        }
+
+        #event-log-list { /* New ID for the actual list of logs */
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            color: var(--cor-texto-secundario);
+        }
+        #event-log-list .log-entry {
+            border-bottom: 1px solid #eee;
+            padding: 0.25rem 0.5rem;
+        }
+        #event-log-list .log-entry .timestamp {
+            color: #999;
+            font-weight: 600;
+        }
+        
+        /* Main Menu Toggle */
+        #main-menu-toggle {
+            position: absolute; /* Changed to absolute to be relative to #status-bar */
+            top: 0.5rem; /* Adjusted top position */
+            right: 0.5rem; /* Positioned to the right */
+            transform: none; /* Removed transform as it's no longer centered */
+            z-index: 1031; /* Above modals */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Lighter shadow */
+            border-radius: 50%; /* Make it circular */
+            width: 48px; /* Fixed width for circular button */
+            height: 48px; /* Fixed height for circular button */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem; /* Icon size */
+            padding: 0; /* Remove padding from button */
+        }
+        #main-menu-toggle .btn {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #main-menu-toggle .btn .fas {
+            margin: 0; /* Remove margin from icon */
+        }
+        #main-menu-toggle .btn span {
+            display: none; /* Hide text on small circular button */
+        }
+        
+        /* Modals */
+        .modal-fullscreen {
+             background-color: var(--cor-fundo);
+        }
+        .modal-header, .modal-footer {
+            border-color: var(--cor-sombra);
+        }
+        .modal-title {
+            color: var(--cor-destaque);
+            font-family: var(--fonte-narrativa);
+            font-weight: 700;
+        }
+        #inventoryList .list-group-item {
+            background-color: transparent;
+            border-color: rgba(0,0,0,0.08);
+        }
+        /* Character Modal Specific Styles */
+        .character-stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .character-stat-item:last-child {
+            border-bottom: none;
+        }
+        .character-stat-item .stat-label {
+            font-weight: 600;
+            color: var(--cor-texto-principal);
+        }
+        .character-stat-item .stat-value {
+            color: var(--cor-texto-secundario);
+        }
+        .character-stat-item .progress {
+            flex-grow: 1;
+            margin-left: 1rem;
+            margin-right: 0.5rem;
+        }
+        .attribute-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .attribute-item .attribute-label {
+            font-weight: 600;
+        }
+        .attribute-item .attribute-value {
+            font-weight: normal;
+        }
+        .attribute-item .btn-attribute-increase {
+            margin-left: 10px;
+        }
+        /* Equipment Modal Specific Styles */
+        .equipment-slot {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .equipment-slot:last-child {
+            border-bottom: none;
+        }
+        .equipment-slot .slot-label {
+            font-weight: 600;
+            width: 100px; /* Fixed width for labels */
+        }
+        .equipment-slot .item-details-display { /* New class for item name + stats */
+            flex-grow: 1;
+            text-align: center;
+            color: var(--cor-texto-secundario);
+            display: flex; /* Use flex to align name and stats */
+            flex-direction: column; /* Stack name and stats */
+            align-items: center;
+        }
+        .equipment-slot .item-details-display .item-name-text {
+            font-weight: 500;
+        }
+        .equipment-slot .item-details-display .item-stats-text {
+            font-size: 0.8em; /* Smaller font for stats */
+            color: #777; /* Slightly lighter color */
+        }
+        .equipment-slot .item-details-display.empty {
+            font-style: italic;
+            color: #999;
+        }
+        /* Event Log Toggle Button Styles */
+        #eventLogToggleButton { /* Updated ID */
+            display: flex;
+            flex-direction: column; /* Stack items vertically */
+            align-items: center;
+            text-align: center;
+            font-weight: 600;
+            padding: 0.75rem 1rem;
+        }
+        #eventLogToggleButton .log-header-title { /* New class for the title row */
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem; /* Small space between title and last entry */
+            font-size: 0.8rem; /* Smaller font for the title */
+            color: var(--cor-texto-secundario);
+        }
+        #eventLogToggleButton #logToggleIcon {
+            transition: transform 0.3s ease;
+        }
+        #event-log-collapse:not(.show) + .card-header #logToggleIcon { /* Icon points down when collapsed */
+            transform: rotate(0deg);
+        }
+        #event-log-collapse.show + .card-header #logToggleIcon { /* Icon points up when expanded */
+            transform: rotate(180deg);
+        }
+        #lastLogEntryDisplay {
+            width: 100%; /* Take full width of its container */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.95rem; /* Slightly larger font for the last entry */
+            color: var(--cor-texto-principal); /* More prominent color */
+        }
+        /* Card styling for the log */
+        #event-log-container .card {
+            border: none;
+            border-radius: 0;
+        }
+        #event-log-container .card-header {
+            background-color: #f8f9fa; /* Light background for header */
+            border-bottom: 1px solid #e9ecef;
+            padding: 0; /* Remove default padding as button handles it */
+        }
+        #event-log-container .card-body {
+            padding: 0;
+        }
+
+        /* Combat UI Styles */
+        #combat-area {
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 1px solid var(--cor-sombra);
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        #combat-area.active {
+            display: flex;
+        }
+        #enemy-display {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        #enemy-name {
+            font-family: var(--fonte-narrativa);
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cor-hp);
+        }
+        #enemy-hp-bar-container {
+            width: 100%;
+            height: 1.2rem;
+            background-color: rgba(0,0,0,0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        #enemy-hp-bar {
+            height: 100%;
+            background-color: var(--cor-hp);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: width 0.3s ease-in-out;
+        }
+        #combat-actions-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            width: 100%;
+        }
+
+        /* Custom styles for main menu modal */
+        .modal-menu-custom .modal-content {
+            border-radius: 10px;
+            background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent background */
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-menu-custom .modal-header {
+            background-color: rgba(248, 249, 250, 0.8); /* Lighter, slightly transparent header */
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+
+        .modal-menu-custom .modal-title {
+            font-size: 1.25rem; /* Smaller title font size */
+            font-weight: 700;
+            color: var(--cor-destaque);
+        }
+
+        /* Shop Modal Specific Styles */
+        #shopModal .nav-link.active {
+            background-color: var(--cor-destaque) !important;
+            color: white !important;
+        }
+        #shopModal .nav-link {
+            color: var(--cor-texto-principal);
+        }
+        #shopModal .list-group-item {
+            background-color: transparent;
+            border-color: rgba(0,0,0,0.08);
+        }
+        .badge-upgrade {
+            background-color: #28a745; /* Green for upgrade */
+            color: white;
+            margin-left: 5px;
+            font-size: 0.75em;
+            padding: 0.3em 0.6em;
+            border-radius: 0.25rem;
+        }
+
+        /* Quest Modal Specific Styles */
+        #questsModal .nav-link.active {
+            background-color: var(--cor-destaque) !important;
+            color: white !important;
+        }
+        #questsModal .nav-link {
+            color: var(--cor-texto-principal);
+        }
+        #questsModal .list-group-item {
+            background-color: transparent;
+            border-color: rgba(0,0,0,0.08);
+            margin-bottom: 0.5rem; /* Space between quest items */
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        #questsModal .quest-title {
+            font-weight: 700;
+            color: var(--cor-destaque);
+            font-size: 1.1rem;
+        }
+        #questsModal .quest-description {
+            font-size: 0.9rem;
+            color: var(--cor-texto-secundario);
+            margin-top: 0.25rem;
+        }
+        #questsModal .quest-objectives, #questsModal .quest-rewards {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+        #questsModal .quest-objectives ul, #questsModal .quest-rewards ul {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+        }
+        #questsModal .quest-objectives li, #questsModal .quest-rewards li {
+            margin-bottom: 0.2rem;
+        }
+        #questsModal .quest-progress-bar {
+            height: 0.75rem;
+            font-size: 0.6rem;
+            margin-top: 0.5rem;
+        }
+        #questsModal .btn-quest-action {
+            margin-top: 0.75rem;
+            width: 100%;
+        }
+
+        /* Skills Modal Specific Styles */
+        #skillsModal .nav-link.active {
+            background-color: var(--cor-destaque) !important;
+            color: white !important;
+        }
+        #skillsModal .nav-link {
+            color: var(--cor-texto-principal);
+        }
+        #skillsModal .list-group-item {
+            background-color: transparent;
+            border-color: rgba(0,0,0,0.08);
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        #skillsModal .skill-title {
+            font-weight: 700;
+            color: var(--cor-destaque);
+            font-size: 1.1rem;
+        }
+        #skillsModal .skill-description {
+            font-size: 0.9rem;
+            color: var(--cor-texto-secundario);
+            margin-top: 0.25rem;
+        }
+        #skillsModal .skill-details {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+        #skillsModal .btn-skill-action {
+            margin-top: 0.75rem;
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            #game-container {
+                border-radius: 0;
+                box-shadow: none;
+            }
+            #status-bar {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 0.5rem;
+            }
+            #main-menu-toggle {
+                top: 0.5rem;
+                right: 0.5rem;
+            }
+            #main-content {
+                padding-top: 4rem; /* Ensure padding for smaller screens too */
+            }
+            /* Adjust modal for smaller screens to be less intrusive */
+            .modal-menu-custom .modal-dialog {
+                margin: 1rem auto; /* Center with some margin */
+                max-width: 90%; /* Take up more width */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Status Bar -->
+        <header id="status-bar" class="d-flex justify-content-between align-items-center flex-wrap">
+            <div class="status-info">
+                <div id="playerName" class="name">Lyra, a Exploradora</div>
+                <div id="playerClass" class="small text-muted">Aventureira</div>
+            </div>
+            <div class="flex-grow-1" style="min-width: 200px;">
+                <div class="progress mb-1" title="Pontos de Vida">
+                    <div id="playerHPBar" class="progress-bar progress-bar-hp" role="progressbar" style="width: 80%;">80/100 PV</div>
+                </div>
+                <div class="progress" title="Pontos de Mana">
+                    <div id="playerMPBar" class="progress-bar progress-bar-mp" role="progressbar" style="width: 60%;">30/50 PM</div>
+                </div>
+                 <div class="progress mt-1" title="Experiência">
+                    <div id="playerXPBar" class="progress-bar progress-bar-xp" role="progressbar" style="width: 0%;">Nível 1 (0%)</div>
+                </div>
+            </div>
+            <!-- Main Menu Toggle Button - Moved inside status bar for absolute positioning -->
+            <div id="main-menu-toggle">
+                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#mainMenuModal">
+                    <i class="fas fa-bars"></i> <span>Menu Principal</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content (Narrative & Actions) -->
+        <main id="main-content">
+            <div id="narrative-area">Carregando aventura...</div>
+
+            <!-- Combat Area (Hidden by default) -->
+            <div id="combat-area">
+                <div id="enemy-display">
+                    <div id="enemy-name"></div>
+                    <div id="enemy-hp-bar-container">
+                        <div id="enemy-hp-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+                <div id="combat-actions-buttons">
+                    <!-- Combat action buttons will be injected here -->
+                </div>
+            </div>
+
+            <div id="action-buttons"></div>
+        </main>
+
+        <!-- Event Log -->
+        <div id="event-log-container">
+            <div class="card">
+                <div class="card-header p-0">
+                    <button class="btn btn-light w-100 d-flex flex-column align-items-center py-2" type="button" data-bs-toggle="collapse" data-bs-target="#event-log-collapse" aria-expanded="false" aria-controls="event-log-collapse" id="eventLogToggleButton">
+                        <small class="text-muted log-header-title">Log de Eventos <i class="fas fa-chevron-down ms-1" id="logToggleIcon"></i></small>
+                        <span id="lastLogEntryDisplay" class="fw-bold text-dark"></span>
+                    </button>
+                </div>
+                <div class="collapse" id="event-log-collapse">
+                    <div class="card-body p-0">
+                        <div id="event-log-list" class="list-group list-group-flush">
+                            <!-- Log entries will be added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <!-- Main Menu Modal -->
+    <div class="modal fade" id="mainMenuModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-menu-custom"> 
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Menu Principal</h5> 
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-grid gap-3">
+                        <button class="btn btn-outline-primary btn-lg" data-bs-target="#inventoryModal" data-bs-toggle="modal"><i class="fas fa-fw fa-bag-shopping"></i> Inventário</button>
+                        <button class="btn btn-outline-primary btn-lg" data-bs-target="#equipmentModal" data-bs-toggle="modal"><i class="fas fa-fw fa-shield-alt"></i> Equipamento</button>
+                        <button class="btn btn-outline-primary btn-lg" data-bs-target="#characterModal" data-bs-toggle="modal"><i class="fas fa-fw fa-user"></i> Personagem</button>
+                        <button class="btn btn-outline-primary btn-lg" data-bs-target="#magicModal" data-bs-toggle="modal"><i class="fas fa-fw fa-hat-wizard"></i> Magia</button>
+                        <button class="btn btn-outline-primary btn-lg" data-bs-target="#skillsModal" data-bs-toggle="modal"><i class="fas fa-fw fa-magic"></i> Habilidades</button>
+                        <button class="btn btn-outline-primary btn-lg" data-bs-target="#questsModal" data-bs-toggle="modal"><i class="fas fa-fw fa-scroll"></i> Missões</button>
+                        <button class="btn btn-outline-secondary btn-lg" data-bs-target="#systemModal" data-bs-toggle="modal"><i class="fas fa-fw fa-cog"></i> Sistema</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Fechar Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Inventory Modal -->
+    <div class="modal fade" id="inventoryModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Inventário</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Seus pertences atuais.</p>
+                    <ul class="list-group list-group-flush" id="inventoryList">
+                       <!-- Items will be added here -->
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment Modal -->
+    <div class="modal fade" id="equipmentModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Equipamento</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="equipmentDetailsBody">
+                    <!-- Equipment details will be dynamically loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-success w-100 mb-2" id="equipBestButton">Equipar Melhor</button>
+                    <button class="btn btn-primary w-100" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Character Modal -->
+    <div class="modal fade" id="characterModal" tabindex="-1">
+         <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Detalhes do Personagem</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body" id="characterDetailsBody">
+                    <!-- Character details will be dynamically loaded here -->
+                </div>
+                <div class="modal-footer"><button class="btn btn-primary" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Magic Modal (New) -->
+    <div class="modal fade" id="magicModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Grimório</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Seus feitiços conhecidos:</p>
+                    <ul class="list-group list-group-flush" id="spellList">
+                       <!-- Spells will be added here -->
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Modal (New) -->
+    <div class="modal fade" id="shopModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Loja do Mercador</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="shopTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="buy-tab" data-bs-toggle="tab" data-bs-target="#buy-pane" type="button" role="tab" aria-controls="buy-pane" aria-selected="true">Comprar</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="sell-tab" data-bs-toggle="tab" data-bs-target="#sell-pane" type="button" role="tab" aria-controls="sell-pane" aria-selected="false">Vender</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="shopTabContent">
+                        <div class="tab-pane fade show active" id="buy-pane" role="tabpanel" aria-labelledby="buy-tab" tabindex="0">
+                            <h6>Itens à Venda:</h6>
+                            <ul class="list-group list-group-flush" id="shopBuyList">
+                                <!-- Items for sale will be added here -->
+                            </ul>
+                        </div>
+                        <div class="tab-pane fade" id="sell-pane" role="tabpanel" aria-labelledby="sell-tab" tabindex="0">
+                            <h6>Seus Itens para Venda:</h6>
+                            <ul class="list-group list-group-flush" id="shopSellList">
+                                <!-- Player's items to sell will be added here -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <p class="me-auto mb-0">Ouro: <strong id="playerGoldDisplay"></strong></p>
+                    <button class="btn btn-primary" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quests Modal (New) -->
+    <div class="modal fade" id="questsModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Missões</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="questTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="available-quests-tab" data-bs-toggle="tab" data-bs-target="#available-quests-pane" type="button" role="tab" aria-controls="available-quests-pane" aria-selected="true">Disponíveis</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="active-quests-tab" data-bs-toggle="tab" data-bs-target="#active-quests-pane" type="button" role="tab" aria-controls="active-quests-pane" aria-selected="false">Ativas</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="completed-quests-tab" data-bs-toggle="tab" data-bs-target="#completed-quests-pane" type="button" role="tab" aria-controls="completed-quests-pane" aria-selected="false">Concluídas</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="questTabContent">
+                        <div class="tab-pane fade show active" id="available-quests-pane" role="tabpanel" aria-labelledby="available-quests-tab" tabindex="0">
+                            <ul class="list-group list-group-flush" id="availableQuestsList">
+                                <!-- Available quests will be added here -->
+                            </ul>
+                        </div>
+                        <div class="tab-pane fade" id="active-quests-pane" role="tabpanel" aria-labelledby="active-quests-tab" tabindex="0">
+                            <ul class="list-group list-group-flush" id="activeQuestsList">
+                                <!-- Active quests will be added here -->
+                            </ul>
+                        </div>
+                        <div class="tab-pane fade" id="completed-quests-pane" role="tabpanel" aria-labelledby="completed-quests-tab" tabindex="0">
+                            <ul class="list-group list-group-flush" id="completedQuestsList">
+                                <!-- Completed quests will be added here -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary w-100" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skills Modal (New) -->
+    <div class="modal fade" id="skillsModal" tabindex="-1">
+         <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Habilidades</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="skillsTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="learned-skills-tab" data-bs-toggle="tab" data-bs-target="#learned-skills-pane" type="button" role="tab" aria-controls="learned-skills-pane" aria-selected="true">Aprendidas</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="available-skills-tab" data-bs-toggle="tab" data-bs-target="#available-skills-pane" type="button" role="tab" aria-controls="available-skills-pane" aria-selected="false">Disponíveis</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="skillsTabContent">
+                        <div class="tab-pane fade show active" id="learned-skills-pane" role="tabpanel" aria-labelledby="learned-skills-tab" tabindex="0">
+                            <ul class="list-group list-group-flush" id="learnedSkillsList">
+                                <!-- Learned skills will be added here -->
+                            </ul>
+                        </div>
+                        <div class="tab-pane fade" id="available-skills-pane" role="tabpanel" aria-labelledby="available-skills-tab" tabindex="0">
+                            <ul class="list-group list-group-flush" id="availableSkillsList">
+                                <!-- Available skills will be added here -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <p class="me-auto mb-0">Pontos de Atributo: <strong id="playerSkillPointsDisplay"></strong></p>
+                    <button class="btn btn-primary w-100" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Modal (New) -->
+     <div class="modal fade" id="systemModal" tabindex="-1">
+         <div class="modal-dialog modal-dialog-centered modal-menu-custom">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Sistema</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="d-grid gap-3">
+                        <button class="btn btn-success btn-lg" id="saveGameButton"><i class="fas fa-save"></i> Guardar Jogo</button>
+                        <button class="btn btn-info btn-lg" id="loadGameButton"><i class="fas fa-upload"></i> Carregar Jogo</button>
+                        <button class="btn btn-danger btn-lg" id="resetGameButton"><i class="fas fa-redo"></i> Reiniciar Jogo</button>
+                    </div>
+                </div>
+                <div class="modal-footer"><button class="btn btn-primary w-100" data-bs-target="#mainMenuModal" data-bs-toggle="modal">Voltar</button></div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Game Logic -->
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        const Game = {
+            elements: {},
+            player: {},
+            scenes: {}, // This will hold both static and dynamically generated scenes
+            modals: {},
+            consumables: {}, 
+            items: {}, 
+            enemies: {}, 
+            spells: {}, 
+            shops: {}, 
+            quests: {}, 
+            skills: {}, 
+            state: 'exploring', 
+            currentEnemy: null, 
+            SAVE_KEY: 'rpgTextGameSave', // Key for localStorage
+
+            init() {
+                this.cacheDOMElements();
+                this.initPlayerState();
+                this.initConsumables(); 
+                this.initItems(); 
+                this.initEnemies(); 
+                this.initSpells(); 
+                this.initShops(); 
+                this.initQuests(); 
+                this.initSkills(); 
+                this.scenes = this.initScenesStatic(); // Initialize with static scenes
+                this.initModals();
+                this.setupEventListeners();
+                
+                // Try to load game first, otherwise start new game
+                if (!this.loadGame()) {
+                    this.loadScene('floresta_antiga');
+                    this.addToLog('A aventura começa.');
+                }
+                this.calculateDerivedStats(); 
+            },
+
+            cacheDOMElements() {
+                this.elements.playerName = document.getElementById('playerName');
+                this.elements.playerHPBar = document.getElementById('playerHPBar');
+                this.elements.playerMPBar = document.getElementById('playerMPBar');
+                this.elements.playerXPBar = document.getElementById('playerXPBar');
+                this.elements.narrativeArea = document.getElementById('narrative-area');
+                this.elements.actionButtons = document.getElementById('action-buttons');
+                this.elements.eventLogList = document.getElementById('event-log-list'); 
+                this.elements.lastLogEntryDisplay = document.getElementById('lastLogEntryDisplay'); 
+                this.elements.logToggleIcon = document.getElementById('logToggleIcon'); 
+                this.elements.inventoryList = document.getElementById('inventoryList');
+                this.elements.characterDetailsBody = document.getElementById('characterDetailsBody');
+                this.elements.equipmentDetailsBody = document.getElementById('equipmentDetailsBody'); 
+                this.elements.eventLogToggleButton = document.getElementById('eventLogToggleButton'); 
+
+                this.elements.combatArea = document.getElementById('combat-area');
+                this.elements.enemyName = document.getElementById('enemy-name');
+                this.elements.enemyHpBar = document.getElementById('enemy-hp-bar');
+                this.elements.combatActionButtons = document.getElementById('combat-actions-buttons');
+
+                this.elements.spellList = document.getElementById('spellList'); 
+                this.elements.equipBestButton = document.getElementById('equipBestButton'); 
+
+                this.elements.shopBuyList = document.getElementById('shopBuyList');
+                this.elements.shopSellList = document.getElementById('shopSellList');
+                this.elements.playerGoldDisplay = document.getElementById('playerGoldDisplay');
+
+                this.elements.availableQuestsList = document.getElementById('availableQuestsList');
+                this.elements.activeQuestsList = document.getElementById('activeQuestsList');
+                this.elements.completedQuestsList = document.getElementById('completedQuestsList');
+
+                this.elements.learnedSkillsList = document.getElementById('learnedSkillsList');
+                this.elements.availableSkillsList = document.getElementById('availableSkillsList');
+                this.elements.playerSkillPointsDisplay = document.getElementById('playerSkillPointsDisplay');
+
+                // System buttons
+                this.elements.saveGameButton = document.getElementById('saveGameButton');
+                this.elements.loadGameButton = document.getElementById('loadGameButton');
+                this.elements.resetGameButton = document.getElementById('resetGameButton');
+            },
+
+            initPlayerState() {
+                this.player = {
+                    name: 'Lyra, a Exploradora',
+                    class: 'Aventureira',
+                    hp: 80,
+                    maxHp: 100, 
+                    mp: 30,
+                    maxMp: 50, 
+                    level: 1,
+                    xp: 0,
+                    xpToNextLevel: 100,
+                    skillPoints: 1, 
+                    strength: 5,     
+                    dexterity: 5,
+                    intelligence: 5,
+                    constitution: 5,
+                    attack: 10, 
+                    defense: 5, 
+                    location: null,
+                    inventory: {
+                        'Mochila de Couro': 1,
+                        'Tocha de Óleo': 1,
+                        'Poção de Cura Leve': 2,
+                        'Moedas de Ouro': 150, 
+                        'Espada Curta': 1, 
+                        'Elmo de Couro': 1, 
+                        'Anel Simples': 1, 
+                    },
+                    equipment: { 
+                        head: null,
+                        body: null,
+                        weapon: null,
+                        shield: null,
+                        accessory1: null,
+                        accessory2: null,
+                    },
+                    spells: ['Bola de Fogo', 'Cura Menor'], 
+                    currentStrength: 0, 
+                    currentDexterity: 0, 
+                    currentIntelligence: 0, 
+                    currentConstitution: 0, 
+                    currentMaxHp: 0, 
+                    currentMaxMp: 0, 
+                    currentAttack: 0, 
+                    currentDefense: 0, 
+                    activeQuests: [], 
+                    completedQuests: [], 
+                    claimedQuests: [], 
+                    learnedSkills: [], 
+                };
+            },
+
+            initConsumables() {
+                this.consumables = {
+                    'Poção de Cura Leve': { effect: { hp: 25 }, message: 'Você bebeu uma Poção de Cura Leve e recuperou 25 PV.' },
+                    'Folha de Luz': { effect: { hp: 10, mp: 5 }, message: 'Você usou uma Folha de Luz e recuperou 10 PV e 5 PM.' }
+                };
+            },
+
+            initItems() {
+                this.items = {
+                    'Espada Curta': { type: 'weapon', stats: { strengthBonus: 2, dexterityBonus: 1, attackBonus: 5 }, value: 20 }, 
+                    'Elmo de Couro': { type: 'head', stats: { constitutionBonus: 1, hpBonus: 10, defenseBonus: 2 }, value: 15 }, 
+                    'Anel Simples': { type: 'accessory', stats: { intelligenceBonus: 1, mpBonus: 5 }, value: 10 },
+                    'Mochila de Couro': { type: 'misc', value: 5 },
+                    'Tocha de Óleo': { type: 'misc', value: 2 },
+                    'Moedas de Ouro': { type: 'currency', value: 1 }, 
+                    'Poção de Cura Leve': { type: 'consumable', value: 25 },
+                    'Folha de Luz': { type: 'consumable', value: 12 },
+                    'Espada Longa': { type: 'weapon', stats: { strengthBonus: 4, attackBonus: 8 }, value: 50 }, 
+                    'Armadura de Placas': { type: 'body', stats: { constitutionBonus: 3, hpBonus: 20, defenseBonus: 5 }, value: 80 }, 
+                    'Amuleto da Sabedoria': { type: 'accessory', stats: { intelligenceBonus: 3, mpBonus: 15 }, value: 40 },
+                    'Osso Quebrado': { type: 'misc', value: 1 },
+                    'Livro de Magia: Bola de Fogo Avançada': { type: 'magic_book', teaches: 'Bola de Fogo Avançada', value: 75 },
+                    'Livro de Habilidade: Furtividade Aprimorada': { type: 'skill_book', teaches: 'furtividade_aprimorada', value: 60 }
+                };
+            },
+
+            initEnemies() {
+                this.enemies = {
+                    'Esqueleto': {
+                        name: 'Esqueleto',
+                        hp: 30,
+                        maxHp: 30,
+                        attack: 8,
+                        defense: 3,
+                        xpReward: 20,
+                        loot: { 'Moedas de Ouro': 5, 'Osso Quebrado': 1 }
+                    }
+                };
+            },
+
+            initSpells() { 
+                this.spells = {
+                    'Bola de Fogo': { cost: 10, damage: 15, message: 'Você conjura uma Bola de Fogo e causa {damage} de dano!', usableOutsideCombat: false },
+                    'Cura Menor': { cost: 8, heal: 20, message: 'Você conjura Cura Menor e recupera {heal} PV!', usableOutsideCombat: true },
+                    'Bola de Fogo Avançada': { cost: 20, damage: 30, message: 'Você conjura uma Bola de Fogo AVANÇADA e causa {damage} de dano!', usableOutsideCombat: false }
+                };
+            },
+
+            initShops() { 
+                this.shops = {
+                    'Mercador da Floresta': {
+                        name: 'Mercador da Floresta',
+                        inventory: { 
+                            'Poção de Cura Leve': 5,
+                            'Tocha de Óleo': 3,
+                            'Espada Longa': 1,
+                            'Armadura de Placas': 1,
+                            'Amuleto da Sabedoria': 1,
+                            'Folha de Luz': 2,
+                            'Livro de Magia: Bola de Fogo Avançada': 1,
+                            'Livro de Habilidade: Furtividade Aprimorada': 1
+                        },
+                        buyPriceMultiplier: 1.2, 
+                        sellPriceMultiplier: 0.8   
+                    }
+                };
+            },
+
+            initQuests() { 
+                this.quests = {
+                    'caça_esqueletos': {
+                        id: 'caça_esqueletos',
+                        title: 'Caça aos Esqueletos',
+                        description: 'O Ancião da Floresta pede sua ajuda para livrar o cemitério de alguns esqueletos. Derrote 3 esqueletos.',
+                        objectives: [
+                            { type: 'defeat', target: 'Esqueleto', required: 3, current: 0 }
+                        ],
+                        rewards: { xp: 50, gold: 20, items: { 'Poção de Cura Leve': 1 } },
+                        status: 'available' // 'available', 'active', 'completed', 'claimed'
+                    },
+                    'coleta_ervas': {
+                        id: 'coleta_ervas',
+                        title: 'Coleta de Ervas Raras',
+                        description: 'O Ancião precisa de 2 Folhas de Luz para uma poção especial. Encontre-as no Santuário.',
+                        objectives: [
+                            { type: 'collect', target: 'Folha de Luz', required: 2, current: 0 }
+                        ],
+                        rewards: { xp: 30, gold: 15, items: { 'Anel Simples': 1 } },
+                        status: 'available'
+                    }
+                };
+            },
+
+            initSkills() { 
+                this.skills = {
+                    'aura_resiliencia': {
+                        id: 'aura_resiliencia',
+                        name: 'Aura de Resiliência',
+                        description: 'Uma aura passiva que aumenta seus pontos de vida máximos em 15.',
+                        type: 'passive',
+                        cost: { skillPoints: 1 },
+                        requirements: { level: 1 },
+                        effect: { maxHpBonus: 15 }
+                    },
+                    'golpe_preciso': {
+                        id: 'golpe_preciso',
+                        name: 'Golpe Preciso',
+                        description: 'Um ataque ativo que causa dano extra e tem chance de acerto crítico aumentado em combate. Custa 10 PM.',
+                        type: 'active_combat',
+                        cost: { mp: 10, skillPoints: 1 },
+                        requirements: { level: 2, dexterity: 7 },
+                        effect: { damageMultiplier: 1.5, criticalChanceBonus: 0.1 } 
+                    },
+                    'meditacao_focada': {
+                        id: 'meditacao_focada',
+                        name: 'Meditação Focada',
+                        description: 'Uma habilidade ativa fora de combate que restaura 20 PM. Custa 5 PM para usar.',
+                        type: 'active_out_of_combat',
+                        cost: { mp: 5, skillPoints: 1 },
+                        requirements: { level: 1, intelligence: 6 },
+                        effect: { mpRestore: 20 }
+                    },
+                    'furtividade_aprimorada': {
+                        id: 'furtividade_aprimorada',
+                        name: 'Furtividade Aprimorada',
+                        description: 'Aumenta sua destreza em 2 pontos permanentemente. (Passiva)',
+                        type: 'passive',
+                        cost: { skillPoints: 0 }, 
+                        requirements: { level: 3, dexterity: 8 },
+                        effect: { dexterityBonus: 2 }
+                    }
+                };
+            },
+
+            // Static scenes definition
+            initScenesStatic() {
+                return {
+                    floresta_antiga: {
+                        description: "Você está em uma <strong>floresta antiga e densa</strong>, onde a luz do sol mal consegue penetrar a copa das árvores. O ar é húmido e cheira a terra molhada. Diante de você, um caminho se bifurca para <strong>Oeste</strong> e <strong>Leste</strong>.",
+                        actions: {
+                            'Ir': { type: 'submenu', options: {
+                                'Seguir para o Oeste (Cemitério)': { onSelect: () => this.loadScene('cemiterio_antigo') },
+                                'Seguir para o Leste (Santuário)': { onSelect: () => this.loadScene('santuario_escondido') },
+                                'Entrar no Portal Misterioso': { onSelect: () => this.handleAISceneNavigation('ai_scene_portal_entry', 'floresta_antiga', 0) }, // Initial AI scene entry
+                            }},
+                            'Interagir': { type: 'submenu', options: {
+                                'Procurar Frutas': { onSelect: () => {
+                                    if(Math.random() > 0.4) {
+                                        this.changeStat('hp', 5);
+                                        this.addToLog('Você encontra algumas frutas silvestres e recupera 5 PV.');
+                                    } else {
+                                        this.addToLog('Você não encontra nada comestível.');
+                                    }
+                                }},
+                                'Examinar Árvores': { onSelect: () => this.addToLog('As árvores são antigas e cobertas de musgo. Nada fora do comum.') },
+                            }},
+                            'Descansar': { type: 'action', onSelect: () => {
+                                this.changeStat('hp', 10);
+                                this.changeStat('mp', 5);
+                                this.addToLog('Você descansa por um momento, recuperando 10 PV e 5 PM.');
+                            }},
+                            'Visitar o Mercador': { type: 'action', onSelect: () => this.openShop('Mercador da Floresta') },
+                            'Falar com o Ancião': { type: 'action', onSelect: () => this.openQuestsModal() } 
+                        }
+                    },
+                    cemiterio_antigo: {
+                        description: "O caminho a Oeste leva a um <strong>cemitério sombrio</strong>. Lápides tortas e erodidas pelo tempo pontilham a paisagem. Ao fundo, uma <strong>cripta de pedra</strong> se destaca, com sua entrada selada.",
+                        actions: {
+                            'Ir': { type: 'submenu', options: {
+                                'Voltar para a Floresta': { onSelect: () => this.loadScene('floresta_antiga') },
+                            }},
+                            'Interagir': { type: 'submenu', options: {
+                                'Examinar Cripta': { onSelect: () => {
+                                    if(Math.random() > 0.6) {
+                                        this.addToInventory('Anel de Prata Antigo');
+                                        this.addToLog('Você força a entrada da cripta e encontra um Anel de Prata Antigo!');
+                                    } else {
+                                        this.addToLog('A entrada da cripta está firmemente selada. Você não consegue abri-la.');
+                                    }
+                                }},
+                                'Procurar Sepulturas': { onSelect: () => {
+                                    this.changeStat('mp', -5);
+                                    this.addToLog('Uma sensação de pavor percorre seu corpo enquanto você examina as sepulturas. Você perde 5 PM.');
+                                }},
+                            }},
+                            'Enfrentar Esqueleto': { type: 'action', onSelect: () => this.startCombat('Esqueleto') }, 
+                        }
+                    },
+                    santuario_escondido: {
+                        description: "O caminho a Leste revela um <strong>santuário pacífico</strong>. Um riacho de águas cristalinas corre suavemente e diversas <strong>ervas raras</strong> crescem perto de um altar de pedra.",
+                        actions: {
+                            'Ir': { type: 'submenu', options: {
+                                'Voltar para a Floresta': { onSelect: () => {
+                                    if(this.player.inventory['Anel de Prata Antigo']) {
+                                        this.loadScene('final_aventura');
+                                    } else {
+                                        this.loadScene('floresta_antiga');
+                                    }
+                                } },
+                            }},
+                            'Interagir': { type: 'submenu', options: {
+                                'Meditar no Altar': { onSelect: () => {
+                                    this.changeStat('mp', 15);
+                                    this.addToLog('Você medita e sente sua energia mística ser restaurada. Recupera 15 PM.');
+                                }},
+                                'Coletar Ervas Raras': { onSelect: () => {
+                                    if(Math.random() > 0.3) {
+                                        this.addToInventory('Folha de Luz');
+                                        this.addToLog('Você coleta uma Folha de Luz, uma erva com propriedades curativas.');
+                                    } else {
+                                        this.addToLog('Você não consegue identificar nenhuma erva útil.');
+                                    }
+                                }},
+                            }},
+                             'Descansar': { type: 'action', onSelect: () => {
+                                this.changeStat('hp', 20);
+                                this.addToLog('A aura pacífica do local permite um descanso profundo. Você recupera 20 PV.');
+                            }},
+                        }
+                    },
+                    // Predefined anchor scenes
+                    vila_tranquila: {
+                        description: "Você chega a uma <strong>vila tranquila</strong>, com casas de telhados de palha e a fumaça de lareiras subindo ao céu. Os aldeões o cumprimentam com sorrisos calorosos.",
+                        actions: {
+                            'Ir': { type: 'submenu', options: {
+                                'Explorar Arredores': { onSelect: () => this.handleAISceneNavigation('ai_scene_vila_entry', 'vila_tranquila', 0) },
+                                'Voltar para a Floresta': { onSelect: () => this.loadScene('floresta_antiga') },
+                            }},
+                            'Visitar o Mercador': { type: 'action', onSelect: () => this.openShop('Mercador da Floresta') },
+                            'Descansar na Estalagem': { type: 'action', onSelect: () => { this.changeStat('hp', 30); this.changeStat('mp', 15); this.addToLog('Você descansa na estalagem e recupera PV e PM.'); } },
+                        }
+                    },
+                    caverna_escura: {
+                        description: "Uma <strong>caverna escura e húmida</strong> se abre diante de você. O ar é pesado e um cheiro de mofo e terra paira no ambiente. Sons estranhos ecoam das profundezas.",
+                        actions: {
+                            'Ir': { type: 'submenu', options: {
+                                'Avançar na Caverna': { onSelect: () => this.handleAISceneNavigation('ai_scene_caverna_entry', 'caverna_escura', 0) },
+                                'Voltar para a Floresta': { onSelect: () => this.loadScene('floresta_antiga') },
+                            }},
+                            'Enfrentar Criatura': { type: 'action', onSelect: () => this.startCombat('Esqueleto') }, 
+                        }
+                    },
+                    torre_abandonada: {
+                        description: "Uma <strong>torre de pedra abandonada</strong> se ergue solitária no horizonte. Suas janelas escuras parecem olhos vazios, e a porta de madeira range com o vento. Uma aura de magia antiga emana dela.",
+                        actions: {
+                            'Ir': { type: 'submenu', options: {
+                                'Subir na Torre': { onSelect: () => this.handleAISceneNavigation('ai_scene_torre_entry', 'torre_abandonada', 0) },
+                                'Voltar para a Floresta': { onSelect: () => this.loadScene('floresta_antiga') },
+                            }},
+                            'Interagir': { type: 'submenu', options: {
+                                'Pesquisar por Artefatos': { onSelect: () => this.fetchGeminiInformation("um artefato mágico ou segredo da torre") }, 
+                            }},
+                        }
+                    },
+                    final_aventura: {
+                        description: "Ao retornar à floresta com o anel, você sente uma energia pulsando. A floresta parece menos opressiva. Você concluiu esta parte da sua jornada.",
+                        actions: {
+                            'Ir': { type: 'submenu', options: {
+                                'Voltar para a Floresta': { onSelect: () => this.loadScene('floresta_antiga') },
+                            }},
+                        }
+                    },
+                    game_over: { 
+                        description: "Sua jornada termina aqui. A escuridão o consome. <strong>Fim de Jogo.</strong>",
+                        actions: {
+                            'Reiniciar Aventura': { type: 'action', onSelect: () => this.resetGame() },
+                        }
+                    }
+                };
+            },
+
+            initModals() {
+                const modalElements = document.querySelectorAll('.modal');
+                modalElements.forEach(el => {
+                    this.modals[el.id] = new bootstrap.Modal(el);
+                });
+
+                document.getElementById('inventoryModal').addEventListener('show.bs.modal', () => {
+                    this.updateInventoryModal();
+                });
+
+                document.getElementById('characterModal').addEventListener('show.bs.modal', () => {
+                    this.updateCharacterModal();
+                });
+
+                document.getElementById('equipmentModal').addEventListener('show.bs.modal', () => { 
+                    this.updateEquipmentModal();
+                });
+
+                document.getElementById('magicModal').addEventListener('show.bs.modal', () => { 
+                    this.updateMagicModal();
+                });
+
+                document.getElementById('shopModal').addEventListener('show.bs.modal', () => { 
+                    this.updateShopModal();
+                });
+
+                document.getElementById('questsModal').addEventListener('show.bs.modal', () => { 
+                    this.updateQuestsModal();
+                });
+
+                document.getElementById('skillsModal').addEventListener('show.bs.modal', () => { 
+                    this.updateSkillsModal();
+                });
+
+                const eventLogCollapse = document.getElementById('event-log-collapse'); 
+                eventLogCollapse.addEventListener('show.bs.collapse', () => {
+                    this.elements.logToggleIcon.classList.remove('fa-chevron-down');
+                    this.elements.logToggleIcon.classList.add('fa-chevron-up');
+                });
+                eventLogCollapse.addEventListener('hide.bs.collapse', () => {
+                    this.elements.logToggleIcon.classList.remove('fa-chevron-up');
+                    this.elements.logToggleIcon.classList.add('fa-chevron-down');
+                });
+            },
+
+            setupEventListeners() {
+                this.elements.actionButtons.addEventListener('click', (event) => {
+                    const button = event.target.closest('button');
+                    if (!button) {
+                        return;
+                    }
+
+                    const { action, subaction } = button.dataset;
+
+                    if (action === 'back-to-main') {
+                         this.updateActionButtons();
+                    } else if (action) { 
+                        const sceneActions = this.scenes[this.player.location].actions;
+                        const actionData = sceneActions[action];
+
+                        if (!actionData) { 
+                            console.error(`Ação '${action}' não encontrada para a cena '${this.player.location}'.`);
+                            return;
+                        }
+
+                        if (!subaction) { 
+                            if (actionData.type === 'action') {
+                                actionData.onSelect();
+                            } else if (actionData.type === 'submenu') {
+                                this.renderSubmenu(action, actionData.options);
+                            } else {
+                                console.error(`Tipo de ação desconhecido para '${action}': ${actionData.type}`);
+                            }
+                        } else { 
+                            if (actionData.options && actionData.options[subaction]) {
+                                actionData.options[subaction].onSelect();
+                            } else {
+                                console.error(`Sub-ação '${subaction}' da ação '${action}' não encontrada.`);
+                            }
+                        }
+                    }
+                });
+
+                this.elements.characterDetailsBody.addEventListener('click', (event) => {
+                    const button = event.target.closest('.btn-attribute-increase');
+                    if (button) {
+                        const attribute = button.dataset.attribute;
+                        this.allocateSkillPoint(attribute);
+                    }
+                });
+
+                this.elements.equipmentDetailsBody.addEventListener('click', (event) => { 
+                    const button = event.target.closest('.btn-unequip');
+                    if (button) {
+                        const slot = button.dataset.slot;
+                        this.unequipItem(slot);
+                    }
+                });
+
+                this.elements.combatActionButtons.addEventListener('click', (event) => {
+                    const button = event.target.closest('button');
+                    if (!button) {
+                        return;
+                    }
+                    const action = button.dataset.combatAction;
+                    const spellName = button.dataset.spellName; 
+                    if (action) {
+                        this.handleCombatAction(action, spellName); 
+                    }
+                });
+
+                this.elements.spellList.addEventListener('click', (event) => { 
+                    const button = event.target.closest('.btn-cast-spell');
+                    if (button) {
+                        const spellName = button.dataset.spellName;
+                        this.castSpellOutsideCombat(spellName);
+                    }
+                });
+
+                this.elements.equipBestButton.addEventListener('click', () => { 
+                    this.equipBestItems();
+                });
+
+                this.elements.shopBuyList.addEventListener('click', (event) => { 
+                    const button = event.target.closest('.btn-buy-item');
+                    if (button) {
+                        const itemName = button.dataset.itemName;
+                        this.buyItemFromNPC('Mercador da Floresta', itemName);
+                    }
+                });
+
+                this.elements.shopSellList.addEventListener('click', (event) => { 
+                    const button = event.target.closest('.btn-sell-item');
+                    if (button) {
+                        const itemName = button.dataset.itemName;
+                        this.sellItemToNPC('Mercador da Floresta', itemName);
+                    }
+                });
+
+                this.elements.availableQuestsList.addEventListener('click', (event) => {
+                    const button = event.target.closest('.btn-accept-quest');
+                    if (button) {
+                        const questId = button.dataset.questId;
+                        this.acceptQuest(questId);
+                    }
+                });
+
+                this.elements.completedQuestsList.addEventListener('click', (event) => {
+                    const button = event.target.closest('.btn-claim-reward');
+                    if (button) {
+                        const questId = button.dataset.questId;
+                        this.claimQuestReward(questId);
+                    }
+                });
+
+                this.elements.availableSkillsList.addEventListener('click', (event) => {
+                    const button = event.target.closest('.btn-learn-skill');
+                    if (button) {
+                        const skillId = button.dataset.skillId;
+                        this.learnSkill(skillId);
+                    }
+                });
+
+                this.elements.learnedSkillsList.addEventListener('click', (event) => {
+                    const button = event.target.closest('.btn-use-skill');
+                    if (button) {
+                        const skillId = button.dataset.skillId;
+                        this.useSkillOutOfCombat(skillId);
+                    }
+                });
+
+                // System button event listeners
+                this.elements.saveGameButton.addEventListener('click', () => this.saveGame());
+                this.elements.loadGameButton.addEventListener('click', () => this.loadGame());
+                this.elements.resetGameButton.addEventListener('click', () => this.resetGame());
+            },
+
+            loadScene(sceneId) {
+                if (!this.scenes[sceneId]) {
+                    console.error(`Cena não encontrada: ${sceneId}. Redirecionando para floresta_antiga.`);
+                    // Fallback to a default scene if an AI-generated scene is not found (e.g., after a reset)
+                    this.loadScene('floresta_antiga');
+                    this.addToLog('Você se sente desorientado e retorna à Floresta Antiga.');
+                    return;
+                }
+                this.player.location = sceneId;
+                const scene = this.scenes[sceneId];
+                this.elements.narrativeArea.innerHTML = scene.description;
+                this.updateActionButtons();
+                this.updateStatus();
+                this.elements.combatArea.classList.remove('active'); 
+            },
+
+            updateStatus() {
+                this.elements.playerName.textContent = this.player.name;
+                
+                const hpPercent = (this.player.hp / this.player.currentMaxHp) * 100;
+                this.elements.playerHPBar.style.width = `${hpPercent}%`;
+                this.elements.playerHPBar.textContent = `${this.player.hp}/${this.player.currentMaxHp} PV`;
+
+                const mpPercent = (this.player.mp / this.player.currentMaxMp) * 100;
+                this.elements.playerMPBar.style.width = `${mpPercent}%`;
+                this.elements.playerMPBar.textContent = `${this.player.mp}/${this.player.currentMaxMp} PM`;
+
+                const xpPercent = (this.player.xp / this.player.xpToNextLevel) * 100;
+                this.elements.playerXPBar.style.width = `${xpPercent}%`;
+                this.elements.playerXPBar.textContent = `Nível ${this.player.level} (${Math.round(xpPercent)}%)`;
+
+                if (this.elements.playerGoldDisplay) {
+                    this.elements.playerGoldDisplay.textContent = this.player.inventory['Moedas de Ouro'] || 0;
+                }
+                if (this.elements.playerSkillPointsDisplay) {
+                    this.elements.playerSkillPointsDisplay.textContent = this.player.skillPoints;
+                }
+            },
+            
+            updateActionButtons() {
+                this.elements.actionButtons.innerHTML = '';
+                if (this.state === 'exploring') {
+                    const sceneActions = this.scenes[this.player.location].actions;
+                    for (const actionName in sceneActions) {
+                        const button = document.createElement('button');
+                        button.textContent = actionName;
+                        button.className = 'btn btn-outline-dark action-btn';
+                        button.dataset.action = actionName;
+                        this.elements.actionButtons.appendChild(button);
+                    }
+                } else if (this.state === 'combat') {
+                    // Combat actions are handled by updateCombatUI
+                }
+            },
+
+            renderSubmenu(actionName, options) {
+                this.elements.actionButtons.innerHTML = '';
+                const submenuContainer = document.createElement('div');
+                submenuContainer.id = 'submenu-container';
+                submenuContainer.className = 'd-grid gap-2';
+
+                for (const optionName in options) {
+                    const button = document.createElement('button');
+                    button.textContent = optionName;
+                    button.className = 'btn btn-secondary action-btn';
+                    button.dataset.action = actionName;
+                    button.dataset.subaction = optionName;
+                    submenuContainer.appendChild(button);
+                }
+
+                const backButton = document.createElement('button');
+                backButton.textContent = '« Voltar';
+                backButton.className = 'btn btn-link text-muted mt-2';
+                backButton.dataset.action = 'back-to-main';
+                
+                this.elements.actionButtons.appendChild(submenuContainer);
+                this.elements.actionButtons.appendChild(backButton);
+            },
+
+            addToLog(message) {
+                const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry list-group-item'; 
+                logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> - ${message}`;
+                this.elements.eventLogList.prepend(logEntry); 
+
+                const maxLogEntries = 15;
+                while (this.elements.eventLogList.children.length > maxLogEntries) {
+                    this.elements.eventLogList.removeChild(this.elements.eventLogList.lastChild);
+                }
+
+                this.elements.lastLogEntryDisplay.textContent = message;
+            },
+            
+            updateInventoryModal() {
+                this.elements.inventoryList.innerHTML = '';
+                if(Object.keys(this.player.inventory).length === 0) {
+                    this.elements.inventoryList.innerHTML = '<li class="list-group-item">Sua mochila está vazia.</li>';
+                    return;
+                }
+                for(const item in this.player.inventory) {
+                    if (this.items[item] && this.items[item].type === 'currency') {
+                        continue;
+                    }
+
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    
+                    const itemText = document.createElement('span');
+                    itemText.textContent = item;
+                    li.appendChild(itemText);
+
+                    const rightSide = document.createElement('div');
+                    rightSide.className = 'd-flex align-items-center';
+
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-secondary rounded-pill me-2';
+                    badge.textContent = this.player.inventory[item];
+                    rightSide.appendChild(badge);
+
+                    // Check if the item is usable (consumable, magic_book, skill_book)
+                    const itemDetails = this.items[item];
+                    if (itemDetails && (itemDetails.type === 'consumable' || itemDetails.type === 'magic_book' || itemDetails.type === 'skill_book')) {
+                        const useButton = document.createElement('button');
+                        useButton.textContent = 'Usar';
+                        useButton.className = 'btn btn-sm btn-success me-2';
+                        useButton.dataset.itemName = item;
+                        useButton.addEventListener('click', () => {
+                            this.useItem(item);
+                            // Inventory modal update is now handled by useItem
+                        });
+                        rightSide.appendChild(useButton);
+                    }
+                    
+                    // Check if the item is equipable
+                    if (itemDetails && ['head', 'body', 'weapon', 'shield', 'accessory'].includes(itemDetails.type)) {
+                        let isEquipped = false;
+                        if (itemDetails.type === 'accessory') {
+                            if (this.player.equipment.accessory1 === item || this.player.equipment.accessory2 === item) {
+                                isEquipped = true;
+                            }
+                        } else if (this.player.equipment[itemDetails.type] === item) {
+                            isEquipped = true;
+                        }
+
+                        if (!isEquipped) {
+                            const equipButton = document.createElement('button');
+                            equipButton.textContent = 'Equipar';
+                            equipButton.className = 'btn btn-sm btn-info';
+                            equipButton.dataset.itemName = item;
+                            equipButton.addEventListener('click', () => {
+                                this.equipItem(item);
+                                this.updateInventoryModal(); 
+                                this.updateEquipmentModal(); 
+                                this.updateCharacterModal(); 
+                            });
+                            rightSide.appendChild(equipButton);
+                        } else {
+                            const equippedText = document.createElement('span');
+                            equippedText.className = 'badge bg-info';
+                            equippedText.textContent = 'Equipado';
+                            rightSide.appendChild(equippedText);
+                        }
+                    }
+                    
+                    li.appendChild(rightSide);
+                    this.elements.inventoryList.appendChild(li);
+                }
+            },
+
+            updateEquipmentModal() {
+                const equipmentSlots = {
+                    head: 'Cabeça',
+                    body: 'Corpo',
+                    weapon: 'Arma',
+                    shield: 'Escudo',
+                    accessory1: 'Acessório 1',
+                    accessory2: 'Acessório 2'
+                };
+
+                let htmlContent = '';
+                for (const slot in equipmentSlots) {
+                    const equippedItemName = this.player.equipment[slot];
+                    const itemDisplayName = equippedItemName ? equippedItemName : 'Vazio';
+                    const itemClass = equippedItemName ? '' : 'empty';
+                    let statString = '';
+
+                    if (equippedItemName && this.items[equippedItemName] && this.items[equippedItemName].stats) {
+                        const stats = this.items[equippedItemName].stats;
+                        const statParts = [];
+                        if (stats.attackBonus) statParts.push(`+${stats.attackBonus} Ataque`);
+                        if (stats.defenseBonus) statParts.push(`+${stats.defenseBonus} Defesa`);
+                        if (stats.hpBonus) statParts.push(`+${stats.hpBonus} PV`);
+                        if (stats.mpBonus) statParts.push(`+${stats.mpBonus} PM`);
+                        if (stats.strengthBonus) statParts.push(`+${stats.strengthBonus} Força`);
+                        if (stats.dexterityBonus) statParts.push(`+${stats.dexterityBonus} Destreza`);
+                        if (stats.intelligenceBonus) statParts.push(`+${stats.intelligenceBonus} Inteligência`);
+                        if (stats.constitutionBonus) statParts.push(`+${stats.constitutionBonus} Constituição`);
+                        
+                        if (statParts.length > 0) {
+                            statString = `<span class="item-stats-text">(${statParts.join(', ')})</span>`;
+                        }
+                    }
+
+                    htmlContent += `
+                        <div class="equipment-slot">
+                            <span class="slot-label">${equipmentSlots[slot]}:</span>
+                            <div class="item-details-display ${itemClass}">
+                                <span class="item-name-text">${itemDisplayName}</span>
+                                ${statString}
+                            </div>
+                            ${equippedItemName ? `<button class="btn btn-sm btn-danger btn-unequip" data-slot="${slot}">Desequipar</button>` : ''}
+                        </div>
+                    `;
+                }
+                this.elements.equipmentDetailsBody.innerHTML = htmlContent;
+            },
+
+            updateCharacterModal() {
+                const player = this.player;
+                const attributeNames = {
+                    strength: 'Força',
+                    dexterity: 'Destreza',
+                    intelligence: 'Inteligência',
+                    constitution: 'Constituição'
+                };
+
+                let htmlContent = `
+                    <div class="character-stat-item">
+                        <span class="stat-label">Nome:</span>
+                        <span class="stat-value">${player.name}</span>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Classe:</span>
+                        <span class="stat-value">${player.class}</span>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Nível:</span>
+                        <span class="stat-value">${player.level}</span>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Experiência:</span>
+                        <div class="progress flex-grow-1 mx-2">
+                            <div class="progress-bar progress-bar-xp" role="progressbar" style="width: ${Math.round((player.xp / player.xpToNextLevel) * 100)}%;">
+                                ${player.xp}/${player.xpToNextLevel} XP
+                            </div>
+                        </div>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Pontos de Vida:</span>
+                        <div class="progress flex-grow-1 mx-2">
+                            <div class="progress-bar progress-bar-hp" role="progressbar" style="width: ${Math.round((player.hp / player.currentMaxHp) * 100)}%;">
+                                ${player.hp}/${player.currentMaxHp} PV
+                            </div>
+                        </div>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Pontos de Mana:</span>
+                        <div class="progress flex-grow-1 mx-2">
+                            <div class="progress-bar progress-bar-mp" role="progressbar" style="width: ${Math.round((player.mp / player.currentMaxMp) * 100)}%;">
+                                ${player.mp}/${player.currentMaxMp} PM
+                            </div>
+                        </div>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Ataque:</span>
+                        <span class="stat-value">${player.currentAttack}</span>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Defesa:</span>
+                        <span class="stat-value">${player.currentDefense}</span>
+                    </div>
+                    <div class="character-stat-item">
+                        <span class="stat-label">Localização:</span>
+                        <span class="stat-value">${player.location ? player.location.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Desconhecida'}</span>
+                    </div>
+                `;
+
+                // Attributes section
+                htmlContent += `<h6 class="mt-4 mb-2">Atributos:</h6>`;
+                const attributes = ['strength', 'dexterity', 'intelligence', 'constitution'];
+                attributes.forEach(attr => {
+                    htmlContent += `
+                        <div class="attribute-item">
+                            <span class="attribute-label">${attributeNames[attr]}:</span>
+                            <span class="attribute-value">${player[attr]}</span>
+                            ${player.skillPoints > 0 ? `<button class="btn btn-sm btn-info btn-attribute-increase" data-attribute="${attr}">+</button>` : ''}
+                        </div>
+                    `;
+                });
+
+                if (player.skillPoints > 0) {
+                    htmlContent += `<p class="mt-3 text-success">Pontos de Atributo Disponíveis: <strong>${player.skillPoints}</strong></p>`;
+                } else {
+                    htmlContent += `<p class="mt-3 text-muted small">Nenhum ponto de atributo disponível.</p>`;
+                }
+
+                this.elements.characterDetailsBody.innerHTML = htmlContent;
+            },
+
+            calculateDerivedStats() {
+                const player = this.player;
+
+                // Reset current stats to base values
+                player.currentMaxHp = player.constitution * 10;
+                player.currentMaxMp = player.intelligence * 5;
+                player.currentAttack = player.strength * 2; 
+                player.currentDefense = player.constitution * 1; 
+                player.currentStrength = player.strength;
+                player.currentDexterity = player.dexterity;
+                player.currentIntelligence = player.intelligence;
+                player.currentConstitution = player.constitution;
+
+                // Apply equipment bonuses
+                for (const slot in player.equipment) {
+                    const itemName = player.equipment[slot];
+                    if (itemName && this.items[itemName] && this.items[itemName].stats) {
+                        const itemStats = this.items[itemName].stats;
+                        player.currentMaxHp += itemStats.hpBonus || 0;
+                        player.currentMaxMp += itemStats.mpBonus || 0;
+                        player.currentStrength += itemStats.strengthBonus || 0;
+                        player.currentDexterity += itemStats.dexterityBonus || 0;
+                        player.currentIntelligence += itemStats.intelligenceBonus || 0;
+                        player.currentConstitution += itemStats.constitutionBonus || 0;
+                        player.currentAttack += itemStats.attackBonus || 0; 
+                        player.currentDefense += itemStats.defenseBonus || 0; 
+                    }
+                }
+
+                // Apply passive skill bonuses
+                player.learnedSkills.forEach(skillId => {
+                    const skill = this.skills[skillId];
+                    if (skill && skill.type === 'passive' && skill.effect) {
+                        player.currentMaxHp += skill.effect.maxHpBonus || 0;
+                        player.currentMaxMp += skill.effect.maxMpBonus || 0;
+                        player.currentAttack += skill.effect.attackBonus || 0;
+                        player.currentDefense += skill.effect.defenseBonus || 0;
+                        player.currentStrength += skill.effect.strengthBonus || 0;
+                        player.currentDexterity += skill.effect.dexterityBonus || 0;
+                        player.currentIntelligence += skill.effect.intelligenceBonus || 0;
+                        player.currentConstitution += skill.effect.constitutionBonus || 0;
+                    }
+                });
+
+                // Ensure current HP/MP don't exceed new max
+                player.hp = Math.min(player.hp, player.currentMaxHp);
+                player.mp = Math.min(player.mp, player.currentMaxMp);
+
+                this.updateStatus(); 
+            },
+
+            changeStat(stat, value) {
+                if (stat === 'hp') {
+                    this.player.hp = Math.max(0, Math.min(this.player.currentMaxHp, this.player.hp + value));
+                } else if (stat === 'mp') {
+                    this.player.mp = Math.max(0, Math.min(this.player.currentMaxMp, this.player.mp + value));
+                } else if (stat === 'xp') {
+                    this.player.xp += value;
+                    if (this.player.xp >= this.player.xpToNextLevel) {
+                        this.player.level++;
+                        this.player.xp -= this.player.xpToNextLevel;
+                        this.player.xpToNextLevel = Math.round(this.player.xpToNextLevel * 1.5); 
+                        this.player.skillPoints += 1; 
+                        this.addToLog(`Parabéns! Você alcançou o Nível ${this.player.level}! Você ganhou 1 Ponto de Atributo!`);
+                        this.calculateDerivedStats(); 
+                    }
+                } else if (stat === 'gold') { 
+                    this.player.inventory['Moedas de Ouro'] = (this.player.inventory['Moedas de Ouro'] || 0) + value;
+                    if (this.player.inventory['Moedas de Ouro'] < 0) {
+                        this.player.inventory['Moedas de Ouro'] = 0;
+                    }
+                }
+                this.updateStatus();
+            },
+
+            allocateSkillPoint(attribute) {
+                if (this.player.skillPoints > 0) {
+                    this.player[attribute]++;
+                    this.player.skillPoints--;
+                    const attributeDisplayName = {
+                        strength: 'Força',
+                        dexterity: 'Destreza',
+                        intelligence: 'Inteligência',
+                        constitution: 'Constituição'
+                    }[attribute] || attribute;
+                    this.addToLog(`Você aumentou sua ${attributeDisplayName} para ${this.player[attribute]}.`);
+                    this.calculateDerivedStats(); 
+                    this.updateCharacterModal(); 
+                } else {
+                    this.addToLog('Você não tem pontos de atributo para alocar.');
+                }
+            },
+
+            addToInventory(item, quantity = 1) {
+                if(this.player.inventory[item]) {
+                    this.player.inventory[item] += quantity;
+                } else {
+                    this.player.inventory[item] = quantity;
+                }
+                this.addToLog(`Você adquiriu ${quantity}x ${item}.`);
+                this.updateQuestProgress('collect', item, quantity); 
+            },
+            
+            removeFromInventory(item, quantity = 1) {
+                if(this.player.inventory[item] && this.player.inventory[item] >= quantity) {
+                    this.player.inventory[item] -= quantity;
+                    if(this.player.inventory[item] <= 0) {
+                        delete this.player.inventory[item];
+                    }
+                    return true;
+                }
+                return false;
+            },
+
+            equipItem(itemName) {
+                const itemDetails = this.items[itemName];
+                if (!itemDetails || !['head', 'body', 'weapon', 'shield', 'accessory'].includes(itemDetails.type)) {
+                    this.addToLog(`Não é possível equipar '${itemName}'.`);
+                    return;
+                }
+                if (!this.player.inventory[itemName] || this.player.inventory[itemName] < 1) {
+                    this.addToLog(`Você não tem '${itemName}' no seu inventário.`);
+                    return;
+                }
+
+                let targetSlot = itemDetails.type;
+                let unequippedItem = null;
+
+                if (targetSlot === 'accessory') {
+                    if (!this.player.equipment.accessory1) {
+                        targetSlot = 'accessory1';
+                    } else if (!this.player.equipment.accessory2) {
+                        targetSlot = 'accessory2';
+                    } else {
+                        const acc1Item = this.player.equipment.accessory1 ? this.items[this.player.equipment.accessory1] : null;
+                        const acc2Item = this.player.equipment.accessory2 ? this.items[this.player.equipment.accessory2] : null;
+                        const score1 = acc1Item ? this.getItemScore(acc1Item, 'accessory') : -1;
+                        const score2 = acc2Item ? this.getItemScore(acc2Item, 'accessory') : -1;
+
+                        if (this.getItemScore(itemDetails, 'accessory') > score1 && this.getItemScore(itemDetails, 'accessory') > score2) {
+                            if (score1 <= score2) {
+                                unequippedItem = this.player.equipment.accessory1;
+                                this.player.equipment.accessory1 = null;
+                                targetSlot = 'accessory1';
+                            } else {
+                                unequippedItem = this.player.equipment.accessory2;
+                                this.player.equipment.accessory2 = null;
+                                targetSlot = 'accessory2';
+                            }
+                            this.addToLog(`O ${unequippedItem} foi desequipado para dar lugar ao novo acessório.`);
+                            this.addToInventory(unequippedItem);
+                        } else if (this.getItemScore(itemDetails, 'accessory') > score1) {
+                            unequippedItem = this.player.equipment.accessory1;
+                            this.player.equipment.accessory1 = null;
+                            targetSlot = 'accessory1';
+                            this.addToLog(`O ${unequippedItem} foi desequipado para dar lugar ao novo acessório.`);
+                            this.addToInventory(unequippedItem);
+                        } else if (this.getItemScore(itemDetails, 'accessory') > score2) {
+                            unequippedItem = this.player.equipment.accessory2;
+                            this.player.equipment.accessory2 = null;
+                            targetSlot = 'accessory2';
+                            this.addToLog(`O ${unequippedItem} foi desequipado para dar lugar ao novo acessório.`);
+                            this.addToInventory(unequippedItem);
+                        } else {
+                            this.addToLog(`O ${itemName} não é melhor que os acessórios equipados.`);
+                            return; 
+                        }
+                    }
+                } else {
+                    if (this.player.equipment[targetSlot]) {
+                        unequippedItem = this.player.equipment[targetSlot];
+                        this.addToLog(`O ${unequippedItem} foi desequipado.`);
+                        this.addToInventory(unequippedItem); 
+                    }
+                }
+                
+                this.removeFromInventory(itemName); 
+                this.player.equipment[targetSlot] = itemName; 
+                this.addToLog(`Você equipou o(a) ${itemName}.`);
+                this.calculateDerivedStats(); 
+                this.updateEquipmentModal(); 
+                this.updateInventoryModal(); 
+                this.updateCharacterModal(); 
+            },
+
+            unequipItem(slotName) {
+                const equippedItemName = this.player.equipment[slotName];
+                if (!equippedItemName) {
+                    this.addToLog(`Não há item equipado no slot '${slotName}'.`);
+                    return;
+                }
+
+                this.player.equipment[slotName] = null; 
+                this.addToInventory(equippedItemName); 
+                this.addToLog(`Você desequipou o(a) ${equippedItemName}.`);
+                this.calculateDerivedStats(); 
+                this.updateEquipmentModal(); 
+                this.updateInventoryModal(); 
+                this.updateCharacterModal(); 
+            },
+
+            useItem(itemName) {
+                const itemDetails = this.items[itemName];
+                if (!itemDetails) {
+                    this.addToLog(`Não é possível usar '${itemName}'.`);
+                    return;
+                }
+
+                if (itemDetails.type === 'consumable') {
+                    const consumable = this.consumables[itemName];
+                    if (!consumable) { 
+                        this.addToLog(`Erro: Detalhes de consumível para '${itemName}' não encontrados.`);
+                        return;
+                    }
+                    if (this.removeFromInventory(itemName)) {
+                        if (consumable.effect.hp) this.changeStat('hp', consumable.effect.hp);
+                        if (consumable.effect.mp) this.changeStat('mp', consumable.effect.mp);
+                        if (consumable.effect.xp) this.changeStat('xp', consumable.effect.xp);
+                        this.addToLog(consumable.message);
+                        if (this.state === 'combat') {
+                            setTimeout(() => this.enemyTurn(), 1000);
+                        }
+                    } else {
+                        this.addToLog(`Você não tem '${itemName}'.`);
+                    }
+                } else if (itemDetails.type === 'magic_book') {
+                    if (this.removeFromInventory(itemName)) {
+                        this.learnSpell(itemDetails.teaches);
+                    } else {
+                        this.addToLog(`Você não tem '${itemName}'.`);
+                    }
+                } else if (itemDetails.type === 'skill_book') {
+                    if (this.removeFromInventory(itemName)) {
+                        this.learnSkill(itemDetails.teaches, true); // Pass true for fromBook
+                    } else {
+                        this.addToLog(`Você não tem '${itemName}'.`);
+                    }
+                } else {
+                    this.addToLog(`Não é possível usar '${itemName}'.`);
+                }
+                this.updateInventoryModal(); 
+            },
+
+            // Combat Functions
+            startCombat(enemyId) {
+                this.state = 'combat';
+                this.currentEnemy = { ...this.enemies[enemyId] }; 
+                this.addToLog(`Um ${this.currentEnemy.name} aparece! Prepare-se para a batalha!`);
+                this.elements.narrativeArea.innerHTML = `Você está em combate com um <strong>${this.currentEnemy.name}</strong>!`;
+                this.updateCombatUI();
+                this.elements.combatArea.classList.add('active'); 
+                this.elements.actionButtons.innerHTML = ''; 
+            },
+
+            updateCombatUI() {
+                if (!this.currentEnemy) return;
+
+                this.elements.enemyName.textContent = this.currentEnemy.name;
+                const enemyHpPercent = (this.currentEnemy.hp / this.currentEnemy.maxHp) * 100;
+                this.elements.enemyHpBar.style.width = `${enemyHpPercent}%`;
+                this.elements.enemyHpBar.textContent = `${this.currentEnemy.hp}/${this.currentEnemy.maxHp} PV`;
+
+                this.elements.combatActionButtons.innerHTML = `
+                    <button class="btn btn-danger action-btn" data-combat-action="attack">Atacar</button>
+                    <button class="btn btn-primary action-btn" data-combat-action="magic">Magia</button>
+                    <button class="btn btn-warning action-btn" data-combat-action="use_item">Usar Item</button>
+                    <button class="btn btn-info action-btn" data-combat-action="flee">Fugir</button>
+                `;
+            },
+
+            handleCombatAction(action, spellName = null) { 
+                if (this.state !== 'combat' || !this.currentEnemy) return;
+
+                switch (action) {
+                    case 'attack':
+                        this.playerAttack();
+                        break;
+                    case 'use_item':
+                        this.modals.inventoryModal.show(); 
+                        break;
+                    case 'flee':
+                        this.attemptFlee();
+                        break;
+                    case 'magic': 
+                        this.renderCombatSpellOptions(); 
+                        return; 
+                    case 'cast_spell': 
+                        this.castSpellInCombat(spellName); 
+                        break;
+                    case 'back_to_combat_main': 
+                        this.updateCombatUI(); 
+                        return; 
+                }
+                this.updateCombatUI(); 
+                this.updateStatus(); 
+            },
+
+            playerAttack() {
+                const damage = Math.max(0, this.player.currentAttack - this.currentEnemy.defense);
+                this.currentEnemy.hp -= damage;
+                this.addToLog(`Você ataca o ${this.currentEnemy.name} e causa ${damage} de dano.`);
+
+                if (this.currentEnemy.hp <= 0) {
+                    this.endCombat('victory');
+                } else {
+                    setTimeout(() => this.enemyTurn(), 1000); 
+                }
+            },
+
+            enemyTurn() {
+                if (this.state !== 'combat' || !this.currentEnemy) return;
+
+                const damage = Math.max(0, this.currentEnemy.attack - this.player.currentDefense);
+                this.changeStat('hp', -damage); 
+                this.addToLog(`${this.currentEnemy.name} ataca você e causa ${damage} de dano.`);
+
+                if (this.player.hp <= 0) {
+                    this.endCombat('defeat');
+                }
+                this.updateCombatUI(); 
+                this.updateStatus(); 
+            },
+
+            attemptFlee() {
+                const fleeChance = 0.5; 
+                if (Math.random() < fleeChance) {
+                    this.addToLog('Você conseguiu fugir da batalha!');
+                    this.endCombat('flee');
+                } else {
+                    this.addToLog('Você falhou em fugir!');
+                    setTimeout(() => this.enemyTurn(), 1000); 
+                }
+            },
+
+            endCombat(outcome) {
+                this.state = 'exploring';
+                this.elements.combatArea.classList.remove('active'); 
+                this.elements.combatActionButtons.innerHTML = ''; 
+                
+                if (outcome === 'victory') {
+                    const defeatedEnemyName = this.currentEnemy.name;
+                    const xpGained = this.currentEnemy.xpReward;
+                    const lootItems = { ...this.currentEnemy.loot }; 
+
+                    this.addToLog(`Você derrotou o ${defeatedEnemyName}!`);
+                    this.changeStat('xp', xpGained);
+                    this.addToLog(`Você ganhou ${xpGained} de experiência.`);
+                    for (const item in lootItems) {
+                        this.addToInventory(item, lootItems[item]);
+                    }
+                    this.updateQuestProgress('defeat', defeatedEnemyName, 1); 
+                    this.loadScene(this.player.location); 
+                } else if (outcome === 'defeat') {
+                    this.addToLog('Você foi derrotado...');
+                    this.loadScene('game_over'); 
+                } else if (outcome === 'flee') {
+                    this.loadScene(this.player.location); 
+                }
+                this.updateStatus(); 
+                this.currentEnemy = null; 
+            },
+
+            // Magic Functions (both in and out of combat)
+            renderCombatSpellOptions() { 
+                this.elements.combatActionButtons.innerHTML = ''; 
+                this.player.spells.forEach(spellId => {
+                    const spellDetails = this.spells[spellId];
+                    if (spellDetails && !spellDetails.usableOutsideCombat) { 
+                        const button = document.createElement('button');
+                        button.textContent = `${spellId} (${spellDetails.cost} PM)`;
+                        button.className = 'btn btn-secondary action-btn'; 
+                        button.dataset.combatAction = 'cast_spell';
+                        button.dataset.spellName = spellId;
+                        this.elements.combatActionButtons.appendChild(button);
+                    }
+                });
+
+                const backButton = document.createElement('button');
+                backButton.textContent = '« Voltar';
+                backButton.className = 'btn btn-link text-muted mt-2';
+                backButton.dataset.combatAction = 'back_to_combat_main';
+                this.elements.combatActionButtons.appendChild(backButton);
+            },
+
+            castSpellInCombat(spellName) {
+                const spellDetails = this.spells[spellName];
+                if (!spellDetails) {
+                    this.addToLog(`Feitiço '${spellName}' não encontrado.`);
+                    return;
+                }
+                if (this.player.mp < spellDetails.cost) {
+                    this.addToLog(`Não tem PM suficiente para conjurar ${spellName}.`);
+                    return;
+                }
+
+                this.changeStat('mp', -spellDetails.cost); 
+
+                let message = spellDetails.message;
+                if (spellDetails.damage) {
+                    const damage = spellDetails.damage;
+                    this.currentEnemy.hp -= damage;
+                    message = message.replace('{damage}', damage);
+                    this.addToLog(message);
+                    if (this.currentEnemy.hp <= 0) {
+                        this.endCombat('victory');
+                        return; 
+                    }
+                } else if (spellDetails.heal) {
+                    const healAmount = spellDetails.heal;
+                    this.changeStat('hp', healAmount);
+                    message = message.replace('{heal}', healAmount);
+                    this.addToLog(message);
+                }
+                
+                setTimeout(() => this.enemyTurn(), 1000);
+            },
+
+            updateMagicModal() {
+                this.elements.spellList.innerHTML = '';
+                const usableSpells = this.player.spells.filter(spellId => this.spells[spellId].usableOutsideCombat);
+
+                if (usableSpells.length === 0) {
+                    this.elements.spellList.innerHTML = '<li class="list-group-item">Não tem feitiços que possam ser usados fora de combate.</li>';
+                    return;
+                }
+
+                usableSpells.forEach(spellId => {
+                    const spellDetails = this.spells[spellId];
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    
+                    const spellText = document.createElement('span');
+                    spellText.textContent = `${spellId} (${spellDetails.cost} PM)`;
+                    li.appendChild(spellText);
+
+                    const castButton = document.createElement('button');
+                    castButton.textContent = 'Lançar';
+                    castButton.className = 'btn btn-sm btn-primary btn-cast-spell';
+                    castButton.dataset.spellName = spellId;
+                    li.appendChild(castButton);
+                    
+                    this.elements.spellList.appendChild(li);
+                });
+            },
+
+            castSpellOutsideCombat(spellName) {
+                const spellDetails = this.spells[spellName];
+                if (!spellDetails || !spellDetails.usableOutsideCombat) {
+                    this.addToLog(`Feitiço '${spellName}' não pode ser usado fora de combate.`);
+                    return;
+                }
+                if (!this.player.spells.includes(spellName)) { 
+                    this.addToLog(`Você ainda não aprendeu '${spellName}'.`);
+                    return;
+                }
+                if (this.player.mp < spellDetails.cost) {
+                    this.addToLog(`Você não tem PM suficiente para conjurar ${spellName}.`);
+                    return;
+                }
+
+                this.changeStat('mp', -spellDetails.cost); 
+
+                let message = spellDetails.message;
+                if (spellDetails.heal) {
+                    const healAmount = spellDetails.heal;
+                    this.changeStat('hp', healAmount);
+                    message = message.replace('{heal}', healAmount);
+                    this.addToLog(message);
+                } else {
+                    this.addToLog(`Você conjurou ${spellName}.`); 
+                }
+                
+                this.updateMagicModal(); 
+                this.updateStatus(); 
+            },
+
+            learnSpell(spellId) { 
+                const spell = this.spells[spellId];
+                if (!spell) {
+                    this.addToLog(`Feitiço '${spellId}' não encontrado.`);
+                    return;
+                }
+                if (this.player.spells.includes(spellId)) {
+                    this.addToLog(`Você já conhece o feitiço: "${spell.name}".`);
+                    return;
+                }
+                this.player.spells.push(spellId);
+                this.addToLog(`Você aprendeu o feitiço: "${spell.name}"!`);
+                this.updateMagicModal();
+            },
+
+            equipBestItems() {
+                const equipSlots = ['head', 'body', 'weapon', 'shield']; 
+                let changesMade = false;
+
+                equipSlots.forEach(slotType => {
+                    let bestItem = null;
+                    let bestScore = -1;
+                    const currentlyEquippedItemName = this.player.equipment[slotType];
+                    const currentlyEquippedItemDetails = currentlyEquippedItemName ? this.items[currentlyEquippedItemName] : null;
+                    let currentEquippedScore = currentlyEquippedItemDetails ? this.getItemScore(currentlyEquippedItemDetails, slotType) : -1;
+
+                    for (const itemName in this.player.inventory) {
+                        const itemDetails = this.items[itemName];
+                        if (itemDetails && itemDetails.type === slotType && this.player.inventory[itemName] > 0) {
+                            const score = this.getItemScore(itemDetails, slotType);
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestItem = itemName;
+                            }
+                        }
+                    }
+
+                    if (bestItem && bestScore > currentEquippedScore) {
+                        if (currentlyEquippedItemName) {
+                            this.unequipItem(slotType); 
+                        }
+                        this.equipItem(bestItem); 
+                        changesMade = true;
+                    }
+                });
+
+                const accessoryCandidates = [];
+                for (const itemName in this.player.inventory) {
+                    const itemDetails = this.items[itemName];
+                    if (itemDetails && itemDetails.type === 'accessory' && this.player.inventory[itemName] > 0) {
+                        accessoryCandidates.push({ name: itemName, score: this.getItemScore(itemDetails, 'accessory') });
+                    }
+                }
+                accessoryCandidates.sort((a, b) => b.score - a.score);
+
+                let currentAccessories = [];
+                if (this.player.equipment.accessory1) {
+                    currentAccessories.push({ name: this.player.equipment.accessory1, score: this.getItemScore(this.items[this.player.equipment.accessory1], 'accessory'), slot: 'accessory1' });
+                }
+                if (this.player.equipment.accessory2) {
+                    currentAccessories.push({ name: this.player.equipment.accessory2, score: this.getItemScore(this.items[this.player.equipment.accessory2], 'accessory'), slot: 'accessory2' });
+                }
+                currentAccessories.sort((a, b) => a.score - b.score); 
+
+                for (let i = 0; i < accessoryCandidates.length && i < 2; i++) {
+                    const candidate = accessoryCandidates[i];
+                    let equipped = false;
+
+                    if (currentAccessories.length < 2) {
+                        if (!this.player.equipment.accessory1 && candidate.name !== this.player.equipment.accessory2) {
+                            this.equipItem(candidate.name);
+                            changesMade = true;
+                            equipped = true;
+                        } else if (!this.player.equipment.accessory2 && candidate.name !== this.player.equipment.accessory1) {
+                            this.equipItem(candidate.name);
+                            changesMade = true;
+                            equipped = true;
+                        }
+                    } 
+                    
+                    if (!equipped && currentAccessories.length === 2) {
+                        const weakestEquipped = currentAccessories[0]; 
+                        if (candidate.score > weakestEquipped.score && candidate.name !== weakestEquipped.name) {
+                            this.unequipItem(weakestEquipped.slot);
+                            this.equipItem(candidate.name);
+                            changesMade = true;
+                            currentAccessories = [];
+                            if (this.player.equipment.accessory1) {
+                                currentAccessories.push({ name: this.player.equipment.accessory1, score: this.getItemScore(this.items[this.player.equipment.accessory1], 'accessory'), slot: 'accessory1' });
+                            }
+                            if (this.player.equipment.accessory2) {
+                                currentAccessories.push({ name: this.player.equipment.accessory2, score: this.getItemScore(this.items[this.player.equipment.accessory2], 'accessory'), slot: 'accessory2' });
+                            }
+                            currentAccessories.sort((a, b) => a.score - b.score);
+                        }
+                    }
+                }
+
+                if (changesMade) {
+                    this.addToLog('Equipamento otimizado!');
+                    this.updateEquipmentModal();
+                    this.updateInventoryModal();
+                    this.updateCharacterModal();
+                } else {
+                    this.addToLog('Nenhum equipamento melhor encontrado no inventário.');
+                }
+            },
+
+            getItemScore(itemDetails, slotType) {
+                if (!itemDetails || !itemDetails.stats) return 0;
+                const stats = itemDetails.stats;
+                let score = 0;
+
+                switch (slotType) {
+                    case 'weapon':
+                        score += (stats.attackBonus || 0) * 2; 
+                        score += (stats.strengthBonus || 0) * 1.5;
+                        score += (stats.dexterityBonus || 0) * 1;
+                        break;
+                    case 'head':
+                    case 'body':
+                    case 'shield':
+                        score += (stats.defenseBonus || 0) * 2; 
+                        score += (stats.hpBonus || 0) * 1;
+                        score += (stats.constitutionBonus || 0) * 1.5;
+                        break;
+                    case 'accessory':
+                        score += (stats.intelligenceBonus || 0) * 1.5;
+                        score += (stats.mpBonus || 0) * 1;
+                        score += (stats.hpBonus || 0) * 0.5;
+                        score += (stats.strengthBonus || 0) * 0.5; 
+                        score += (stats.dexterityBonus || 0) * 0.5;
+                        score += (stats.constitutionBonus || 0) * 0.5;
+                        break;
+                }
+                return score;
+            },
+
+            // Shop Functions
+            openShop(shopId) {
+                this.currentShop = this.shops[shopId];
+                if (!this.currentShop) {
+                    this.addToLog(`Loja '${shopId}' não encontrada.`);
+                    return;
+                }
+                this.modals.shopModal.show();
+                this.updateShopModal();
+            },
+
+            updateShopModal() {
+                this.elements.shopBuyList.innerHTML = '';
+                this.elements.shopSellList.innerHTML = '';
+                this.updateStatus(); 
+
+                // Populate Buy tab
+                const merchantInventory = this.currentShop.inventory;
+                if (Object.keys(merchantInventory).length === 0) {
+                    this.elements.shopBuyList.innerHTML = '<li class="list-group-item">O mercador não tem nada para vender no momento.</li>';
+                } else {
+                    for (const itemName in merchantInventory) {
+                        const quantity = merchantInventory[itemName];
+                        const itemDetails = this.items[itemName];
+                        if (quantity > 0 && itemDetails && itemDetails.value !== undefined) {
+                            const price = Math.round(itemDetails.value * this.currentShop.buyPriceMultiplier);
+                            let upgradeBadge = '';
+                            if (['head', 'body', 'weapon', 'shield', 'accessory'].includes(itemDetails.type)) {
+                                if (this.isItemAnUpgrade(itemName)) {
+                                    upgradeBadge = '<span class="badge badge-upgrade">Melhoria!</span>';
+                                }
+                            }
+
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            li.innerHTML = `
+                                <span>${itemName} (x${quantity}) ${upgradeBadge}</span>
+                                <div>
+                                    <span class="badge bg-info me-2">${price} Ouro</span>
+                                    <button class="btn btn-sm btn-success btn-buy-item" data-item-name="${itemName}">Comprar</button>
+                                </div>
+                            `;
+                            this.elements.shopBuyList.appendChild(li);
+                        }
+                    }
+                }
+
+                // Populate Sell tab
+                const playerInventory = this.player.inventory;
+                const sellableItems = Object.keys(playerInventory).filter(item => {
+                    const itemDetails = this.items[item];
+                    return itemDetails && itemDetails.value !== undefined && itemDetails.type !== 'currency'; 
+                });
+
+                if (sellableItems.length === 0) {
+                    this.elements.shopSellList.innerHTML = '<li class="list-group-item">Você não tem itens para vender.</li>';
+                } else {
+                    sellableItems.forEach(itemName => {
+                        const quantity = playerInventory[itemName];
+                        const itemDetails = this.items[itemName];
+                        if (quantity > 0 && itemDetails && itemDetails.value !== undefined) {
+                            const price = Math.round(itemDetails.value * this.currentShop.sellPriceMultiplier);
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            li.innerHTML = `
+                                <span>${itemName} (x${quantity})</span>
+                                <div>
+                                    <span class="badge bg-secondary me-2">${price} Ouro</span>
+                                    <button class="btn btn-sm btn-danger btn-sell-item" data-item-name="${itemName}">Vender</button>
+                                </div>
+                            `;
+                            this.elements.shopSellList.appendChild(li);
+                        }
+                    });
+                }
+            },
+
+            buyItemFromNPC(shopId, itemName) {
+                const shop = this.shops[shopId];
+                if (!shop || !shop.inventory[itemName] || shop.inventory[itemName] <= 0) {
+                    this.addToLog(`O mercador não tem mais ${itemName}.`);
+                    return;
+                }
+
+                const itemDetails = this.items[itemName];
+                if (!itemDetails || itemDetails.value === undefined) {
+                    this.addToLog(`Detalhes do item '${itemName}' não encontrados.`);
+                    return;
+                }
+
+                const price = Math.round(itemDetails.value * shop.buyPriceMultiplier);
+                if ((this.player.inventory['Moedas de Ouro'] || 0) < price) {
+                    this.addToLog(`Você não tem ouro suficiente para comprar ${itemName}. (Precisa de ${price} Ouro)`);
+                    return;
+                }
+
+                this.changeStat('gold', -price);
+                shop.inventory[itemName]--;
+                this.addToInventory(itemName, 1);
+                this.addToLog(`Você comprou 1x ${itemName} por ${price} Ouro.`);
+                this.updateShopModal();
+                this.updateInventoryModal(); 
+                this.updateEquipmentModal(); 
+                this.updateCharacterModal(); 
+            },
+
+            sellItemToNPC(shopId, itemName) {
+                const shop = this.shops[shopId];
+                if (!shop) {
+                    this.addToLog(`Loja '${shopId}' não encontrada.`);
+                    return;
+                }
+                if (!this.player.inventory[itemName] || this.player.inventory[itemName] <= 0) {
+                    this.addToLog(`Você não tem ${itemName} para vender.`);
+                    return;
+                }
+
+                const itemDetails = this.items[itemName];
+                if (!itemDetails || itemDetails.value === undefined) {
+                    this.addToLog(`Detalhes do item '${itemName}' não encontrados.`);
+                    return;
+                }
+                if (itemDetails.type === 'currency') { 
+                    this.addToLog('Você não pode vender ouro.');
+                    return;
+                }
+
+                const price = Math.round(itemDetails.value * shop.sellPriceMultiplier);
+                
+                this.removeFromInventory(itemName, 1);
+                this.changeStat('gold', price);
+                shop.inventory[itemName] = (shop.inventory[itemName] || 0) + 1; 
+
+                this.addToLog(`Você vendeu 1x ${itemName} por ${price} Ouro.`);
+                this.updateShopModal();
+                this.updateInventoryModal(); 
+                this.updateEquipmentModal(); 
+                this.updateCharacterModal(); 
+            },
+
+            isItemAnUpgrade(itemName) {
+                const itemDetails = this.items[itemName];
+                if (!itemDetails || !itemDetails.stats) return false; 
+
+                const itemType = itemDetails.type;
+                const itemScore = this.getItemScore(itemDetails, itemType);
+
+                if (itemType === 'accessory') {
+                    const acc1Item = this.player.equipment.accessory1 ? this.items[this.player.equipment.accessory1] : null;
+                    const acc2Item = this.player.equipment.accessory2 ? this.items[this.player.equipment.accessory2] : null;
+                    const score1 = acc1Item ? this.getItemScore(acc1Item, 'accessory') : -1;
+                    const score2 = acc2Item ? this.getItemScore(acc2Item, 'accessory') : -1;
+
+                    if (!this.player.equipment.accessory1 || !this.player.equipment.accessory2) {
+                        return true;
+                    }
+                    return itemScore > Math.min(score1, score2);
+
+                } else { 
+                    const currentlyEquippedItemName = this.player.equipment[itemType];
+                    const currentlyEquippedItemDetails = currentlyEquippedItemName ? this.items[currentlyEquippedItemName] : null;
+                    const currentEquippedScore = currentlyEquippedItemDetails ? this.getItemScore(currentlyEquippedItemDetails, itemType) : -1;
+                    
+                    return itemScore > currentEquippedScore;
+                }
+            },
+
+            // Quest Functions
+            openQuestsModal() {
+                this.modals.questsModal.show();
+                this.updateQuestsModal();
+            },
+
+            updateQuestsModal() {
+                this.elements.availableQuestsList.innerHTML = '';
+                this.elements.activeQuestsList.innerHTML = '';
+                this.elements.completedQuestsList.innerHTML = '';
+
+                // Populate Available Quests
+                for (const questId in this.quests) {
+                    const quest = this.quests[questId];
+                    const isAlreadyActive = this.player.activeQuests.some(q => q.id === questId);
+                    const isAlreadyCompleted = this.player.completedQuests.some(q => q.id === questId);
+                    const isAlreadyClaimed = this.player.claimedQuests.some(q => q.id === questId);
+
+                
